@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Claude Pet 🐾</title>
+  <meta name="theme-color" content="#15151f">
+  <meta name="description" content="口袋里的 Claude 用量桌宠">
+  <link rel="manifest" href="manifest.webmanifest">
+  <!-- iOS add-to-home-screen -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Claude Pet">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <span class="brand">🐾 Claude Pet</span>
+      <button id="gear" class="icon-btn" title="设置" aria-label="设置">⚙</button>
+    </header>
+
+    <!-- the pet lives and walks in here -->
+    <div id="stage">
+      <canvas id="pet" width="16" height="16"></canvas>
+      <div id="bubble" class="hidden"></div>
+      <div id="ground"></div>
+      <div id="demo-tag" class="hidden">演示模式</div>
+    </div>
+
+    <!-- usage + controls -->
+    <section id="panel">
+      <div class="name-row">
+        <button id="prev" class="pix-btn" aria-label="上一只">◀</button>
+        <span id="pet-name">…</span>
+        <button id="next" class="pix-btn" aria-label="下一只">▶</button>
+      </div>
+
+      <div class="bar-row"><span class="bar-label">5H</span>
+        <div class="bar"><div id="bar5" class="bar-fill"></div></div>
+        <span id="pct5" class="bar-pct">--%</span></div>
+      <div id="reset5" class="reset-line"></div>
+
+      <div class="bar-row"><span class="bar-label">周</span>
+        <div class="bar"><div id="barw" class="bar-fill"></div></div>
+        <span id="pctw" class="bar-pct">--%</span></div>
+      <div id="resetw" class="reset-line"></div>
+
+      <div id="msg" class="hidden"></div>
+
+      <div class="action-row">
+        <button id="feed" class="pix-btn wide">🍖 投喂</button>
+        <button id="pause" class="pix-btn wide">⏸ 休息</button>
+        <button id="refresh" class="pix-btn wide">↻ 刷新</button>
+      </div>
+    </section>
+
+    <footer id="foot">
+      <span id="foot-hint"></span>
+    </footer>
+  </div>
+
+  <!-- settings -->
+  <div id="overlay" class="hidden">
+    <div id="settings" role="dialog" aria-label="设置">
+      <h2>设置</h2>
+
+      <label class="field">
+        <span>Claude OAuth Token<small>（可选，自动获取实时用量）</small></span>
+        <textarea id="f-token" rows="3" placeholder="sk-ant-oat... 或 OAuth access token" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+      </label>
+
+      <label class="field">
+        <span>代理 / 中转地址<small>（可选，绕过浏览器 CORS）</small></span>
+        <input id="f-proxy" type="url" inputmode="url" placeholder="https://你的中转/api/oauth/usage" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+
+      <div class="manual-row">
+        <label class="field half">
+          <span>手动 5H %</span>
+          <input id="f-five" type="number" min="0" max="100" inputmode="numeric" placeholder="如 40">
+        </label>
+        <label class="field half">
+          <span>手动 周 %</span>
+          <input id="f-week" type="number" min="0" max="100" inputmode="numeric" placeholder="如 55">
+        </label>
+      </div>
+
+      <p class="hint" id="settings-status"></p>
+      <p class="hint dim">
+        手机浏览器直接调用 Anthropic 接口通常会被 CORS 拦截。最稳的方式是填「手动 %」让宠物反映你的状态；
+        想自动获取就配一个中转地址（详见 README）。Token 只存在本机浏览器，不上传。
+      </p>
+
+      <div class="settings-actions">
+        <button id="s-test" class="pix-btn">测试自动获取</button>
+        <button id="s-clear" class="pix-btn">清空</button>
+        <button id="s-save" class="pix-btn primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="sprites.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

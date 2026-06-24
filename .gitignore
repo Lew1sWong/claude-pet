@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# build output
+dist/
+**/dist/
+
+# os / editor junk
+.DS_Store
+**/.DS_Store
+*.log
+
+# local runtime state — NEVER commit credentials or token-bearing settings
+settings.json
+.credentials.json
+**/.credentials.json
+.env
+*.local

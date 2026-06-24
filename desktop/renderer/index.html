@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="hud" class="hidden">
+    <div id="title-row">
+      <button id="prev" class="pix-btn" title="上一只">◀</button>
+      <span id="pet-name">…</span>
+      <button id="next" class="pix-btn" title="下一只">▶</button>
+      <span class="spacer"></span>
+      <button id="menu" class="pix-btn" title="菜单（换形象/大小/开机自启/退出）">🐾</button>
+      <button id="feed" class="pix-btn" title="投喂">🍖</button>
+      <button id="refresh" class="pix-btn" title="立即刷新">↻</button>
+      <button id="quit" class="pix-btn" title="退出">✕</button>
+    </div>
+    <div class="bar-row"><span class="bar-label">5H</span>
+      <div class="bar"><div id="bar5" class="bar-fill"></div></div>
+      <span id="pct5" class="bar-pct">--%</span></div>
+    <div id="reset5" class="reset-line"></div>
+    <div class="bar-row"><span class="bar-label">周</span>
+      <div class="bar"><div id="barw" class="bar-fill"></div></div>
+      <span id="pctw" class="bar-pct">--%</span></div>
+    <div id="resetw" class="reset-line"></div>
+    <div id="msg" class="hidden"></div>
+  </div>
+  <div id="pet-wrap">
+    <canvas id="pet" width="16" height="16"></canvas>
+    <div id="bubble" class="hidden"></div>
+  </div>
+  <script src="sprites.js"></script>
+  <script src="pet.js"></script>
+</body>
+</html>
