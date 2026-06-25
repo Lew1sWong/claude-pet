@@ -431,84 +431,6 @@ function updateTrayTitle() {
   tray.setToolTip(pctTxt ? `Claude Pet · 5h ${pctTxt}` : "Claude Pet");
 }
 
-// build the radio list of characters, shared by both menus
-function characterMenuItems() {
-  const ch = settings.character || "cat";
-  return CHARACTERS.map(([id, label]) => ({
-    label, type: "radio", checked: ch === id,
-    click: () => setCharacter(id),
-  }));
-}
-
-// display-mode radio (灵动岛 / 悬浮桌宠), shared by both menus
-function uiModeMenuItems() {
-  const m = uiMode();
-  return [
-    { label: "🏝️ 灵动岛", type: "radio", checked: m === "island", click: () => setUiMode("island") },
-    { label: "🐾 悬浮桌宠", type: "radio", checked: m === "float", click: () => setUiMode("float") },
-  ];
-}
-
-// pet-size submenu — only meaningful for the floating pet; the island pet is a
-// fixed size that blends with the notch, so this is omitted in island mode
-function sizeMenuItem() {
-  return {
-    label: "宠物大小",
-    submenu: [48, 64, 96].map((n, i) => ({
-      label: ["小", "中", "大"][i],
-      type: "radio",
-      checked: (settings.petSize || 64) === n,
-      click: () => setPetSize(n),
-    })),
-  };
-}
-
-// 🎮 mini-games submenu (shared). Opening a game shows the window first.
-function openGame(key) {
-  if (!win) return;
-  if (!win.isVisible()) win.show();
-  sendToWin("open-game", key);
-}
-function gamesMenuItem() {
-  return {
-    label: "🎮 玩游戏",
-    submenu: [
-      { label: "🍖 接食物", click: () => openGame("catch") },
-      { label: "⚡ 反应力测试", click: () => openGame("reaction") },
-      { label: "🃏 记忆翻牌", click: () => openGame("memory") },
-    ],
-  };
-}
-
-// 🕶️ boss-key submenu (shared): test trigger + profession/disguise presets
-function professionItems() {
-  const cur = settings.profession || "all";
-  return PROFESSIONS.map(([id, label, ds]) => ({
-    label, type: "radio", checked: cur === id,
-    click: () => setProfession(id, ds),
-  }));
-}
-function setProfession(id, ds) {
-  settings.profession = id;
-  settings.bossDisguises = ds.slice();
-  saveSettings();
-  if (boss) boss.applySettings(settings);
-  buildTray();
-}
-function bossMenuItem() {
-  return {
-    label: "🕶️ 老板键",
-    submenu: [
-      { label: "试一下（显示伪装画面）", click: () => { if (boss) boss.toggle(); } },
-      { type: "separator" },
-      { label: "职业 / 伪装组合", submenu: professionItems() },
-      { type: "separator" },
-      { label: "触发：连按三下 Esc　或　⌘⇧B", enabled: false },
-      { label: "（全局 Esc 需在 系统设置→隐私→辅助功能 授权）", enabled: false },
-    ],
-  };
-}
-
 function buildTray() {
   const icon = nativeImage
     .createFromPath(path.join(__dirname, "assets", "icon.png"))
@@ -597,7 +519,11 @@ ipcMain.on("enter-game-mode", (_e, w, h) => {
   });
 });
 ipcMain.on("exit-game-mode", () => {
-  if (win && !win.isDestroyed() && gameSavedBounds) win.setBounds(gameSavedBounds);
+  if (win && !win.isDestroyed() && gameSavedBounds) {
+    win.setBounds(gameSavedBounds);
+    // island lives at y=0 over the menu bar; re-assert so it isn't re-clamped
+    if (uiMode() === "island") win.setBounds(gameSavedBounds);
+  }
   gameSavedBounds = null;
 });
 
