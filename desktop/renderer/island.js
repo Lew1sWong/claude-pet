@@ -1,0 +1,318 @@
+/* Claude Pet — Dynamic Island renderer. The pet lives inside a black capsule
+   pinned to the top-center notch. It never walks; instead the capsule morphs
+   between a compact pill (pet + 5h %) and an expanded panel (full usage).
+   Reuses the exact same usage→mood pipeline as the floating pet. */
+(function () {
+  "use strict";
+  const api = window.petAPI;
+  const t = window.t;   // i18n lookup (reads window.I18N live)
+  const { computeMode, fmtCd, drawPet } = window.PetCore;
+
+  const CHARS = Object.keys(SPRITES.frames);
+  let character = "cat";
+
+  // ------------------------------------------------------------- dom
+  const island = document.getElementById("island");
+  const canvas = document.getElementById("pet");
+  const ctx = canvas.getContext("2d");
+  const miniPct = document.getElementById("mini-pct");
+  const nameEl = document.getElementById("pet-name");
+  const bubble = document.getElementById("bubble");
+  const msgEl = document.getElementById("msg");
+  const bar5 = document.getElementById("bar5");
+  const barw = document.getElementById("barw");
+  const pct5 = document.getElementById("pct5");
+  const pctw = document.getElementById("pctw");
+  const reset5 = document.getElementById("reset5");
+  const resetw = document.getElementById("resetw");
+
+  // ------------------------------------------------------------- state
+  let usage = null;
+  let errorCode = null;
+  let errorDetail = "";
+  let mode = "unknown";
+  let frameIdx = 0;
+  let lastSwap = 0;
+  let blinkUntil = 0;
+  let nextBlink = performance.now() + 3000;
+  let celebrateUntil = 0;
+  let lastT = performance.now();
+
+  // animation in-place (no walking): pick frame state + cadence per mood
+  const ANIM = {
+    happy:    { state: "walk",  frameMs: 280 },
+    calm:     { state: "idle",  frameMs: 550 },
+    sleepy:   { state: "idle",  frameMs: 900 },
+    anxious:  { state: "walk",  frameMs: 160 },
+    depleted: { state: "sleep", frameMs: 1100 },
+    lost:     { state: "sleep", frameMs: 1300 },
+    unknown:  { state: "idle",  frameMs: 600 },
+  };
+
+  // zh fallbacks; replaced live by window.PetLines from the i18n broadcast
+  let CLICK_LINES = {
+    cat: ["喵~", "(=^･ω･^=)", "呼噜呼噜…", "摸摸!"],
+    dog: ["汪!", "尾巴摇摇~", "(´･ᴥ･`)", "一起加油!"],
+    bear: ["吼~", "抱抱!", "ʕ•ᴥ•ʔ", "蜂蜜呢?"],
+    rabbit: ["蹦蹦~", "(•ㅅ•)", "耳朵不要拉啦!", "一起蹦跶!"],
+    fox: ["嗷呜~", "(◡ ω ◡)", "尾巴毛茸茸的!", "嘿嘿~"],
+    penguin: ["企~", "ʕ•ᴥ•ʔ 摇摇摆", "滑一个!", "(°ㅂ°)"],
+    star: ["✦ 闪!", "我是小克~", "充能中…", "(★ω★)"],
+  };
+  let FEED_LINES = {
+    cat: ["啊呜啊呜~ 小鱼干!", "喵呜~ 好吃!"],
+    dog: ["啊呜! 肉骨头!", "汪汪! 谢谢投喂!"],
+    bear: ["啊呜~ 是蜂蜜味的!", "吧唧吧唧…"],
+    rabbit: ["咔哧咔哧~ 胡萝卜!", "嫩嫩的菜叶子!"],
+    fox: ["啊呜! 这是给我的?", "嗷呜~ 真香!"],
+    penguin: ["啊呜~ 小鱼!", "新鲜的鱼鱼!"],
+    star: ["✦ 吸收能量中…", "嗯! 满电啦!"],
+  };
+  let COMBO = "别 rua 了别 rua 了!!";
+  let RESET_LINE = "额度重置啦!! ✦";
+
+  // ------------------------------------------------------------- pet animation
+  function tick(t) {
+    lastT = t;
+    const a = ANIM[mode] || ANIM.unknown;
+    if (t - lastSwap > a.frameMs) { frameIdx = (frameIdx + 1) % 2; lastSwap = t; }
+    if (t > nextBlink) { blinkUntil = t + 160; nextBlink = t + 2200 + Math.random() * 3500; }
+
+    let bob = a.state === "sleep" ? 0 : Math.sin(t / 420) * 1.2;
+    if (t < celebrateUntil) bob = -Math.abs(Math.sin(t / 85)) * 6;
+    canvas.style.transform = `translateY(${bob.toFixed(2)}px)`;
+
+    drawPet(ctx, character, a.state, frameIdx, t < blinkUntil);
+  }
+  function rafLoop(t) { tick(t); requestAnimationFrame(rafLoop); }
+
+  // ------------------------------------------------------------- usage / hud
+  function setBar(fill, pctEl, lineEl, win) {
+    if (!win) { fill.style.width = "0%"; pctEl.textContent = "--%"; lineEl.textContent = ""; return; }
+    const pct = Math.round(win.pct);
+    fill.style.width = Math.min(100, pct) + "%";
+    fill.classList.toggle("warn", pct >= 70 && pct < 90);
+    fill.classList.toggle("danger", pct >= 90);
+    pctEl.textContent = pct + "%";
+    const cd = fmtCd(win.resetsAt);
+    lineEl.textContent = cd ? "↻ " + cd : "";
+  }
+
+  function refreshMini() {
+    if (errorCode === "no-credentials" || errorCode === "auth") { miniPct.textContent = "?"; miniPct.className = ""; return; }
+    if (errorCode === "rate-limit") { miniPct.textContent = "🚦"; miniPct.className = ""; return; }
+    const f = usage && usage.fiveHour ? Math.round(usage.fiveHour.pct) : null;
+    if (f === null) { miniPct.textContent = "··"; miniPct.className = ""; return; }
+    miniPct.textContent = f + "%";
+    miniPct.className = f >= 90 ? "danger" : f >= 70 ? "warn" : "";
+  }
+
+  function refreshBody() {
+    setBar(bar5, pct5, reset5, usage && usage.fiveHour);
+    setBar(barw, pctw, resetw, usage && usage.week);
+    nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
+    msgEl.classList.add("hidden");
+    if (errorCode === "no-credentials") show(msgEl, t("err.noCreds"));
+    else if (errorCode === "auth") show(msgEl, t("err.auth"));
+    else if (errorCode === "rate-limit") show(msgEl, "🚦 " + (errorDetail || t("err.rate")));
+    else if (errorCode) show(msgEl, t("err.fetch") + (errorDetail ? " · " + errorDetail.slice(0, 80) : ""));
+    else if (mode === "depleted" && usage && usage.fiveHour) show(msgEl, t("msg.depleted") + " " + (fmtCd(usage.fiveHour.resetsAt) || ""));
+  }
+  function show(el, text) { el.textContent = text; el.classList.remove("hidden"); }
+
+  function applyState() {
+    mode = computeMode(usage, errorCode);
+    refreshMini();
+    refreshBody();
+    refreshBubble();
+  }
+
+  // ------------------------------------------------------------- bubble + fx
+  let bubbleTimer = null;
+  function refreshBubble() {
+    clearTimeout(bubbleTimer);
+    if (mode === "depleted" || mode === "lost") {
+      bubble.textContent = mode === "lost" ? "?" : t("bubble.zzz");
+      bubble.classList.remove("hidden");
+    } else {
+      bubble.classList.add("hidden");
+    }
+  }
+  function sayTemp(text, ms) {
+    bubble.textContent = text;
+    bubble.classList.remove("hidden");
+    clearTimeout(bubbleTimer);
+    bubbleTimer = setTimeout(refreshBubble, ms || 1600);
+  }
+  function spawnFx(emoji) {
+    const fx = document.createElement("div");
+    fx.className = "float-fx";
+    const r = island.getBoundingClientRect();
+    fx.textContent = emoji;
+    fx.style.left = (r.left + r.width / 2 + (Math.random() * 30 - 15)) + "px";
+    fx.style.top = (r.bottom - 8 + (Math.random() * 8 - 4)) + "px";
+    document.body.appendChild(fx);
+    setTimeout(() => fx.remove(), 1200);
+  }
+
+  // ------------------------------------------------------------- expand / collapse
+  let hovering = false;
+  let collapseTimer = null;
+  let autoTimer = null;
+  function expand() {
+    clearTimeout(collapseTimer);
+    island.classList.remove("collapsed");
+    island.classList.add("expanded");
+  }
+  function collapse() {
+    island.classList.remove("expanded");
+    island.classList.add("collapsed");
+  }
+  function scheduleCollapse(delay) {
+    clearTimeout(collapseTimer);
+    collapseTimer = setTimeout(() => { if (!hovering) collapse(); }, delay || 500);
+  }
+  // pop open briefly (live-activity style), then auto-collapse unless hovered
+  function autoExpand(ms) {
+    expand();
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(() => { if (!hovering) collapse(); }, ms || 3200);
+  }
+  island.addEventListener("mouseenter", () => { hovering = true; clearTimeout(autoTimer); expand(); });
+  island.addEventListener("mouseleave", () => { hovering = false; scheduleCollapse(500); });
+  // native menus (right-click / 🐾) can swallow the mouseleave, leaving
+  // `hovering` stuck true and the panel stuck open — reconcile against the real
+  // CSS :hover state on blur/focus and a moment after a menu is requested
+  function reconcileHover() {
+    hovering = island.matches(":hover");
+    if (!hovering) scheduleCollapse(150);
+  }
+  function afterMenu() { setTimeout(reconcileHover, 300); setTimeout(reconcileHover, 800); }
+  window.addEventListener("blur", () => { hovering = false; scheduleCollapse(300); });
+  window.addEventListener("focus", reconcileHover);
+
+  // ------------------------------------------------------------- click-through
+  // collapsed: only the pet/% capture the mouse; expanded: the whole capsule.
+  // the empty notch-gap & flank padding stay click-through so they never
+  // swallow real menu-bar clicks (esp. on non-notch / external displays)
+  function overPill(el) {
+    if (!el) return false;
+    if (island.classList.contains("expanded")) return !!el.closest("#island");
+    return !!el.closest("#pet, #mini-pct");
+  }
+  let ignoring = null;
+  document.addEventListener("mousemove", (e) => {
+    if (window.__petGameActive) return;
+    const interactive = overPill(document.elementFromPoint(e.clientX, e.clientY));
+    if (interactive === ignoring) {
+      api.setIgnore(!interactive);
+      ignoring = !interactive;
+    }
+  });
+  api.setIgnore(false);
+  ignoring = false;
+  // games module bypasses this tracker via api.setIgnore; let it restore a safe
+  // click-through state on exit so transparent flanks don't keep eating clicks
+  window.__petResetIgnore = () => { api.setIgnore(true); ignoring = true; };
+
+  // ------------------------------------------------------------- interactions
+  island.addEventListener("contextmenu", (e) => { e.preventDefault(); api.showMenu(); afterMenu(); });
+
+  let comboCount = 0;
+  let comboTimer = null;
+  function onPetClick(e) {
+    e.stopPropagation();
+    comboCount++;
+    clearTimeout(comboTimer);
+    comboTimer = setTimeout(() => (comboCount = 0), 2500);
+    if (comboCount >= 5) {
+      comboCount = 0;
+      sayTemp(COMBO, 2200);
+      celebrateUntil = performance.now() + 1200;
+      let n = 0;
+      const t = setInterval(() => { spawnFx("♥"); if (++n > 6) clearInterval(t); }, 120);
+      return;
+    }
+    const lines = CLICK_LINES[character] || ["♥"];
+    sayTemp(lines[Math.floor(Math.random() * lines.length)]);
+    spawnFx("♥");
+  }
+  canvas.addEventListener("click", onPetClick);
+
+  function feedPet() {
+    const lines = FEED_LINES[character] || ["啊呜~"];
+    sayTemp(lines[Math.floor(Math.random() * lines.length)], 2200);
+    celebrateUntil = performance.now() + 1100;
+    let n = 0;
+    const t = setInterval(() => { spawnFx(n === 0 ? "🍖" : "♥"); if (++n > 3) clearInterval(t); }, 250);
+  }
+
+  function switchCharacter(step) {
+    const i = (CHARS.indexOf(character) + step + CHARS.length) % CHARS.length;
+    api.setCharacter(CHARS[i]); // main saves & broadcasts back
+  }
+  document.getElementById("prev").addEventListener("click", () => switchCharacter(-1));
+  document.getElementById("next").addEventListener("click", () => switchCharacter(1));
+  document.getElementById("feed").addEventListener("click", feedPet);
+  document.getElementById("menu").addEventListener("click", () => { api.showMenu(); afterMenu(); });
+  document.getElementById("refresh").addEventListener("click", () => { sayTemp(t("game.refresh"), 1200); api.refresh(); });
+  document.getElementById("game").addEventListener("click", () => { if (window.PetGames) window.PetGames.open(); });
+
+  // ------------------------------------------------------------- host events
+  const MOOD_ORDER = { happy: 0, calm: 1, sleepy: 2, anxious: 3, depleted: 4 };
+  const knownMood = (m) => m in MOOD_ORDER;
+  api.onUsage((d) => {
+    const prev = mode;
+    usage = d; errorCode = null;
+    applyState();
+    // live-activity: pop open only on a real tightening between two known moods
+    // (not when arriving from the unknown/lost no-data states, e.g. on launch)
+    if (!hovering && knownMood(prev) && knownMood(mode) &&
+        MOOD_ORDER[mode] > MOOD_ORDER[prev] && MOOD_ORDER[mode] >= 2) {
+      autoExpand(3200);
+    }
+  });
+  api.onError((d) => {
+    errorCode = (d && d.code) || "fetch";
+    errorDetail = (d && d.message) || "";
+    applyState();
+  });
+  api.onCelebrate(() => {
+    celebrateUntil = performance.now() + 2600;
+    sayTemp(RESET_LINE, 2600);
+    if (!hovering) autoExpand(3200);
+    let n = 0;
+    const t = setInterval(() => { spawnFx(["✦", "★", "♥"][n % 3]); if (++n > 7) clearInterval(t); }, 300);
+  });
+  api.onCharacter((c) => {
+    if (CHARS.includes(c)) { character = c; window.__petCharacter = c; frameIdx = 0; refreshBody(); }
+  });
+  api.onGeometry((g) => {
+    if (!g) return;
+    const root = document.documentElement.style;
+    if (Number.isFinite(g.notchTop) && g.notchTop > 0) root.setProperty("--bar-h", g.notchTop + "px");
+    if (g.hasNotch && Number.isFinite(g.notchW) && g.notchW > 0) root.setProperty("--notch-w", g.notchW + "px");
+  });
+  api.onOpenGame((k) => { if (window.PetGames) window.PetGames.open(k); });
+  api.onI18n((d) => {
+    window.I18N = d.dict; window.__lang = d.lang;
+    if (d.lines) { CLICK_LINES = d.lines.click; FEED_LINES = d.lines.feed; COMBO = d.lines.combo; RESET_LINE = d.lines.reset; }
+    if (window.applyI18n) window.applyI18n();
+    refreshMini(); refreshBody(); refreshBubble();
+  });
+  api.onFeatures((f) => {
+    const g = document.getElementById("game");
+    if (g) g.style.display = (f && f.games) ? "" : "none";
+  });
+
+  // keep countdowns live
+  setInterval(() => {
+    if (usage) { setBar(bar5, pct5, reset5, usage.fiveHour); setBar(barw, pctw, resetw, usage.week); }
+  }, 1000);
+
+  applyState();
+  refreshBubble();
+  requestAnimationFrame(rafLoop);
+  // watchdog: keep ticking if rAF gets suspended while unfocused/occluded
+  setInterval(() => { const t = performance.now(); if (t - lastT > 900) tick(t); }, 1000);
+})();

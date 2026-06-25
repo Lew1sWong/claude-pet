@@ -3,24 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="games.css">
 </head>
 <body>
   <div id="hud" class="hidden">
     <div id="title-row">
-      <button id="prev" class="pix-btn" title="上一只">◀</button>
+      <button id="prev" class="pix-btn" data-i18n-title="tip.prev" title="上一只">◀</button>
       <span id="pet-name">…</span>
-      <button id="next" class="pix-btn" title="下一只">▶</button>
+      <button id="next" class="pix-btn" data-i18n-title="tip.next" title="下一只">▶</button>
       <span class="spacer"></span>
-      <button id="menu" class="pix-btn" title="菜单（换形象/大小/开机自启/退出）">🐾</button>
-      <button id="feed" class="pix-btn" title="投喂">🍖</button>
-      <button id="refresh" class="pix-btn" title="立即刷新">↻</button>
-      <button id="quit" class="pix-btn" title="退出">✕</button>
+      <button id="menu" class="pix-btn" data-i18n-title="tip.menu" title="菜单">🐾</button>
+      <button id="game" class="pix-btn" data-i18n-title="tip.game" title="玩游戏">🎮</button>
+      <button id="feed" class="pix-btn" data-i18n-title="tip.feed" title="投喂">🍖</button>
+      <button id="refresh" class="pix-btn" data-i18n-title="tip.refresh" title="立即刷新">↻</button>
+      <button id="quit" class="pix-btn" data-i18n-title="tip.quit" title="退出">✕</button>
     </div>
     <div class="bar-row"><span class="bar-label">5H</span>
       <div class="bar"><div id="bar5" class="bar-fill"></div></div>
       <span id="pct5" class="bar-pct">--%</span></div>
     <div id="reset5" class="reset-line"></div>
-    <div class="bar-row"><span class="bar-label">周</span>
+    <div class="bar-row"><span class="bar-label" data-i18n="hud.week">周</span>
       <div class="bar"><div id="barw" class="bar-fill"></div></div>
       <span id="pctw" class="bar-pct">--%</span></div>
     <div id="resetw" class="reset-line"></div>
@@ -31,6 +33,9 @@
     <div id="bubble" class="hidden"></div>
   </div>
   <script src="sprites.js"></script>
+  <script src="petcore.js"></script>
+  <script src="i18n.js"></script>
+  <script src="games.js"></script>
   <script src="pet.js"></script>
 </body>
 </html>

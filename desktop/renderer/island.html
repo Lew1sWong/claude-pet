@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="island.css">
+  <link rel="stylesheet" href="games.css">
+</head>
+<body>
+  <!-- the black "Dynamic Island" capsule, hugging the top-center notch -->
+  <div id="island" class="collapsed">
+    <!-- always-visible top strip; flanks the physical notch (center gap) -->
+    <div class="notch-row">
+      <div class="flank left">
+        <canvas id="pet" width="16" height="16" title="摸摸我~"></canvas>
+      </div>
+      <div class="notch-gap"></div>
+      <div class="flank right">
+        <span id="mini-pct">··</span>
+      </div>
+    </div>
+    <!-- revealed on expand -->
+    <div class="body">
+      <div class="body-head">
+        <span id="pet-name">…</span>
+        <span class="spacer"></span>
+        <button id="prev" class="ibtn" data-i18n-title="tip.prev" title="上一只">◀</button>
+        <button id="next" class="ibtn" data-i18n-title="tip.next" title="下一只">▶</button>
+        <button id="game" class="ibtn" data-i18n-title="tip.game" title="玩游戏">🎮</button>
+        <button id="feed" class="ibtn" data-i18n-title="tip.feed" title="投喂">🍖</button>
+        <button id="refresh" class="ibtn" data-i18n-title="tip.refresh" title="立即刷新">↻</button>
+        <button id="menu" class="ibtn" data-i18n-title="tip.menu" title="菜单">🐾</button>
+      </div>
+      <div class="bar-row"><span class="bar-label">5H</span>
+        <div class="bar"><div id="bar5" class="bar-fill"></div></div>
+        <span id="pct5" class="bar-pct">--%</span></div>
+      <div id="reset5" class="reset-line"></div>
+      <div class="bar-row"><span class="bar-label" data-i18n="hud.week">周</span>
+        <div class="bar"><div id="barw" class="bar-fill"></div></div>
+        <span id="pctw" class="bar-pct">--%</span></div>
+      <div id="resetw" class="reset-line"></div>
+      <div id="msg" class="hidden"></div>
+    </div>
+  </div>
+  <div id="bubble" class="hidden"></div>
+
+  <script src="sprites.js"></script>
+  <script src="petcore.js"></script>
+  <script src="i18n.js"></script>
+  <script src="games.js"></script>
+  <script src="island.js"></script>
+</body>
+</html>

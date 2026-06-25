@@ -1,0 +1,105 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; width: 100%;
+  overflow: hidden; background: #1e1e1e;
+  font-family: -apple-system, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+  cursor: default; user-select: none; -webkit-user-select: none;
+}
+.disguise { display: none; position: absolute; inset: 0; }
+.disguise.show { display: block; }
+
+#boss-hint {
+  position: fixed; bottom: 14px; right: 18px; z-index: 50;
+  font-size: 11px; color: rgba(255,255,255,.35);
+  background: rgba(0,0,0,.35); padding: 3px 9px; border-radius: 8px;
+  pointer-events: none; opacity: 0; transition: opacity .4s ease;
+}
+#boss-hint.flash { opacity: 1; }
+
+/* ──────────────── Terminal ──────────────── */
+#dg-terminal { background: #0c0c0c; }
+.term-body {
+  padding: 14px 18px; height: 100%; overflow: hidden;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 13px; line-height: 1.5; color: #d6d6d6;
+}
+#term-out { white-space: pre-wrap; word-break: break-all; }
+.term-line .p { color: #4ec9b0; }     /* prompt path */
+.term-line .c { color: #569cd6; }     /* command */
+.term-line .ok { color: #6a9955; }
+.term-line .warn { color: #d7ba7d; }
+.term-line .err { color: #f48771; }
+.term-line .dim { color: #808080; }
+.term-cursor { color: #d6d6d6; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ──────────────── Excel ──────────────── */
+#dg-excel { background: #f3f2f1; display: none; flex-direction: column; }
+#dg-excel.show { display: flex; }
+.xl-ribbon { display: flex; align-items: center; gap: 14px; height: 46px; padding: 0 12px;
+  background: #217346; color: #fff; font-size: 13px; }
+.xl-logo { width: 26px; height: 26px; background: #fff; color: #217346; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; border-radius: 4px; }
+.xl-title { font-weight: 600; }
+.xl-tabs { margin-left: auto; opacity: .9; font-size: 12px; }
+.xl-tabs b { border-bottom: 2px solid #fff; padding-bottom: 2px; }
+.xl-formula { display: flex; align-items: center; height: 26px; background: #fff; border-bottom: 1px solid #d0d0d0; font-size: 12px; }
+.xl-cellref { width: 70px; text-align: center; border-right: 1px solid #d0d0d0; color: #444; }
+.xl-fx { padding-left: 12px; color: #222; font-family: "SF Mono", monospace; }
+.xl-grid-wrap { flex: 1; overflow: hidden; background: #fff; }
+#xl-grid { border-collapse: collapse; font-size: 12px; color: #222; table-layout: fixed; }
+#xl-grid th, #xl-grid td { border: 1px solid #e2e2e2; height: 21px; padding: 0 5px; white-space: nowrap; overflow: hidden; }
+#xl-grid th { background: #f3f2f1; color: #666; font-weight: 500; text-align: center; }
+#xl-grid th.rowh, #xl-grid td.rowh { width: 38px; min-width: 38px; text-align: center; background: #f3f2f1; color: #666; }
+#xl-grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
+#xl-grid td.head { font-weight: 700; background: #eaf3ee; }
+#xl-grid td.sel { outline: 2px solid #217346; outline-offset: -2px; }
+.xl-sheets { display: flex; gap: 2px; height: 24px; background: #f3f2f1; border-top: 1px solid #d0d0d0; padding: 0 8px; align-items: flex-end; font-size: 12px; }
+.xl-sheets span { padding: 2px 12px; background: #e7e6e5; color: #555; border-radius: 4px 4px 0 0; }
+.xl-sheets span.active { background: #fff; color: #217346; font-weight: 600; }
+.xl-status { height: 22px; background: #217346; color: #fff; font-size: 11px; display: flex; align-items: center; padding: 0 12px; }
+
+/* ──────────────── Word ──────────────── */
+#dg-word { background: #f3f2f1; display: none; flex-direction: column; }
+#dg-word.show { display: flex; }
+.wd-ribbon { display: flex; align-items: center; gap: 14px; height: 46px; padding: 0 12px; background: #2b579a; color: #fff; font-size: 13px; }
+.wd-logo { width: 26px; height: 26px; background: #fff; color: #2b579a; font-weight: 800; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
+.wd-title { font-weight: 600; }
+.wd-tabs { margin-left: auto; opacity: .9; font-size: 12px; }
+.wd-tabs b { border-bottom: 2px solid #fff; padding-bottom: 2px; }
+.wd-toolbar { height: 30px; background: #fff; border-bottom: 1px solid #d8d8d8; display: flex; align-items: center; gap: 12px; padding: 0 16px; font-size: 12px; color: #333; }
+.wd-page-area { flex: 1; overflow: hidden; padding: 22px 0; display: flex; justify-content: center; }
+.wd-page { width: 720px; max-width: 92%; background: #fff; box-shadow: 0 2px 16px rgba(0,0,0,.18);
+  padding: 64px 76px; color: #222; font-size: 15px; line-height: 1.9; }
+.wd-page h1 { font-size: 22px; text-align: center; margin: 0 0 6px; color: #1a1a1a; }
+.wd-page .sub { text-align: center; color: #888; font-size: 13px; margin-bottom: 26px; }
+.wd-page h2 { font-size: 16px; color: #2b579a; margin: 20px 0 8px; }
+.wd-page p { margin: 0 0 12px; text-align: justify; }
+.wd-caret { display: inline-block; width: 1px; background: #222; animation: blink 1s steps(1) infinite; }
+.wd-status { height: 22px; background: #2b579a; color: #fff; font-size: 11px; display: flex; align-items: center; padding: 0 12px; }
+
+/* ──────────────── VS Code ──────────────── */
+#dg-code { background: #1e1e1e; display: none; flex-direction: column; color: #ccc; }
+#dg-code.show { display: flex; }
+.vs-top { height: 35px; background: #323233; display: flex; align-items: center; gap: 14px; padding: 0 12px; }
+.vs-dots { display: flex; gap: 8px; }
+.vs-dots i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.vs-dots i:nth-child(1){ background:#ff5f56;} .vs-dots i:nth-child(2){ background:#ffbd2e;} .vs-dots i:nth-child(3){ background:#27c93f;}
+.vs-tabs { display: flex; gap: 1px; font-size: 12px; }
+.vs-tabs span { padding: 8px 14px; background: #2d2d2d; color: #969696; }
+.vs-tabs span.active { background: #1e1e1e; color: #fff; border-top: 1px solid #0e639c; }
+.vs-main { flex: 1; display: flex; overflow: hidden; }
+.vs-side { width: 230px; background: #252526; border-right: 1px solid #1a1a1a; font-size: 13px; }
+.vs-side-h { padding: 8px 16px; font-size: 11px; letter-spacing: 1px; color: #bbb; text-transform: uppercase; }
+.vs-tree { padding: 0 8px; }
+.vs-tree .row { padding: 2px 10px; color: #cccccc; white-space: nowrap; border-radius: 4px; }
+.vs-tree .row.dir { color: #c5c5c5; }
+.vs-tree .row.active { background: #37373d; }
+.vs-tree .row.ind { padding-left: 26px; }
+.vs-editor { flex: 1; overflow: hidden; background: #1e1e1e; }
+#vs-code { margin: 0; padding: 12px 16px; font-family: "SF Mono", "Menlo", "Consolas", monospace; font-size: 13px; line-height: 1.55; color: #d4d4d4; white-space: pre; }
+#vs-code .kw { color: #569cd6; } #vs-code .fn { color: #dcdcaa; } #vs-code .str { color: #ce9178; }
+#vs-code .num { color: #b5cea8; } #vs-code .com { color: #6a9955; } #vs-code .ty { color: #4ec9b0; } #vs-code .var { color: #9cdcfe; }
+.vs-caret { display: inline-block; width: 2px; height: 15px; vertical-align: text-bottom; background: #aeafad; animation: blink 1s steps(1) infinite; }
+.vs-statusbar { height: 22px; background: #007acc; color: #fff; font-size: 11px; display: flex; align-items: center; gap: 16px; padding: 0 12px; }
+.vs-statusbar .vs-spacer { flex: 1; }

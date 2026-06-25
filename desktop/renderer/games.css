@@ -1,0 +1,54 @@
+#game-overlay {
+  position: fixed; inset: 0; display: none; flex-direction: column;
+  background: #15151f; color: #e8e8f0;
+  font-family: -apple-system, "PingFang SC", "Menlo", monospace;
+  z-index: 9000; user-select: none; -webkit-user-select: none;
+}
+#game-overlay.show { display: flex; }
+
+.g-top { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: #1f1f2e; border-bottom: 1px solid #333; }
+.g-top .g-title { font-weight: 600; font-size: 13px; letter-spacing: 1px; }
+.g-top .g-score { margin-left: auto; font-size: 12px; color: #9a9ab0; font-variant-numeric: tabular-nums; }
+.g-back, .g-close, .g-btn {
+  background: transparent; border: 1px solid #555; color: #e8e8f0;
+  border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; padding: 2px 8px;
+}
+.g-back:hover, .g-close:hover, .g-btn:hover { background: rgba(255,255,255,.12); }
+.g-btn.primary { background: #3a5bd0; border-color: #3a5bd0; }
+.g-btn.primary:hover { background: #4a6be0; }
+
+.g-stage { flex: 1; position: relative; overflow: hidden; }
+.g-stage canvas { display: block; }
+.g-foot { padding: 8px 10px; display: flex; gap: 8px; align-items: center; justify-content: center; min-height: 0; }
+.g-foot:empty { display: none; }
+
+/* chooser */
+.g-menu { display: flex; flex-direction: column; gap: 12px; padding: 22px; height: 100%; justify-content: center; }
+.g-card { display: flex; align-items: center; gap: 14px; font-size: 26px; padding: 14px 18px;
+  background: #22223a; border: 1px solid #3a3a55; border-radius: 14px; color: #e8e8f0; cursor: pointer; }
+.g-card span { font-size: 15px; letter-spacing: 3px; }
+.g-card:hover { background: #2c2c4a; transform: translateY(-1px); }
+
+/* reaction */
+.g-react { position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; cursor: pointer; text-align: center; }
+.g-react.idle  { background: #22223a; }
+.g-react.wait  { background: #7a2d2d; }
+.g-react.go    { background: #1f7a3d; }
+.g-react.early { background: #7a5a2d; }
+.g-react .big { font-size: 30px; font-weight: 800; }
+.g-react .sm  { font-size: 13px; color: rgba(255,255,255,.85); }
+
+/* memory */
+.g-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px; height: 100%; }
+.g-cell { background: #2a2a44; border: 1px solid #3a3a55; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 22px; }
+.g-cell.up { background: #3a3a60; }
+.g-cell.done { opacity: .32; cursor: default; }
+.g-cell canvas { width: 82%; height: 82%; image-rendering: pixelated; }
+
+/* result overlay */
+.g-over { position: absolute; inset: 0; background: rgba(10,10,18,.86);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.g-over .t { font-size: 20px; font-weight: 800; }
+.g-over .s { font-size: 13px; color: #c9c9e0; line-height: 1.7; }
