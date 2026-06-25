@@ -7,6 +7,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
+    "postinstall": "node scripts/fix-keyserver-perms.js",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac"
@@ -18,7 +19,12 @@
   "build": {
     "appId": "com.claudepet.desktop",
     "productName": "Claude Pet",
-    "directories": { "output": "dist" },
+    "directories": {
+      "output": "dist"
+    },
+    "asarUnpack": [
+      "node_modules/node-global-key-listener/bin/**"
+    ],
     "files": [
       "main.js",
       "preload.js",
@@ -27,14 +33,27 @@
       "assets/**/*"
     ],
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "assets/icon.png",
       "category": "public.app-category.utilities"
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "assets/icon.ico"
     },
@@ -45,5 +64,8 @@
       "createDesktopShortcut": true,
       "shortcutName": "Claude Pet"
     }
+  },
+  "dependencies": {
+    "node-global-key-listener": "^0.3.0"
   }
 }

@@ -4,6 +4,7 @@
 (function () {
   "use strict";
   const api = window.petAPI;
+  const t = window.t;   // i18n lookup (reads window.I18N live)
 
   const CHARS = Object.keys(SPRITES.frames);
   let character = "cat";
@@ -42,6 +43,9 @@
   let moveAcc = 0;
   let lastMoveSend = 0;
   let moveInFlight = false;
+  let begUntil = 0;       // depleted-state "give me tokens" frantic crawl
+  let nextBegFlip = 0;
+  const BEG_SPEED = 64;
 
   const PARAMS = {
     happy:    { anim: "walk",  frameMs: 280, speed: 26 },
@@ -53,7 +57,8 @@
     unknown:  { anim: "auto",  frameMs: 550, speed: 18 }, // no data yet: stroll like calm
   };
 
-  const CLICK_LINES = {
+  // zh fallbacks; replaced live by window.PetLines from the i18n broadcast
+  let CLICK_LINES = {
     cat: ["喵~", "(=^･ω･^=)", "呼噜呼噜…", "摸摸!"],
     dog: ["汪!", "尾巴摇摇~", "(´･ᴥ･`)", "一起加油!"],
     bear: ["吼~", "抱抱!", "ʕ•ᴥ•ʔ", "蜂蜜呢?"],
@@ -63,7 +68,7 @@
     star: ["✦ 闪!", "我是小克~", "充能中…", "(★ω★)"],
   };
 
-  const FEED_LINES = {
+  let FEED_LINES = {
     cat: ["啊呜啊呜~ 小鱼干!", "喵呜~ 好吃!"],
     dog: ["啊呜! 肉骨头!", "汪汪! 谢谢投喂!"],
     bear: ["啊呜~ 是蜂蜜味的!", "吧唧吧唧…"],
@@ -73,63 +78,39 @@
     star: ["✦ 吸收能量中…", "嗯! 满电啦!"],
   };
 
-  const QUIPS = {
+  let QUIPS = {
     happy: ["今天 bug 一定很少!", "额度满满, 冲鸭!", "陪你写代码~", "记得喝水哦"],
     calm: ["悠哉悠哉…", "代码和我, 你先看谁?", "嗯哼~ ♪", "伸个懒腰…"],
     sleepy: ["有点困了…", "额度有点紧张了哦", "省着点问 Claude 呀…"],
     anxious: ["额度快没啦!!", "💦 要不要歇一会?", "快到极限了…"],
   };
+  let COMBO = "别 rua 了别 rua 了!!";
+  let BEG = "求求你🥺给点纯血 token 吧～";
 
   // ------------------------------------------------------------- pet brain
-  function computeMode() {
-    if (errorCode === "no-credentials" || errorCode === "auth") return "lost";
-    if (!usage) return "unknown";
-    const f = usage.fiveHour ? usage.fiveHour.pct : 0;
-    const w = usage.week ? usage.week.pct : 0;
-    const worst = Math.max(f, w);
-    if (f >= 99.5 || w >= 99.5) return "depleted";
-    if (worst >= 90) return "anxious";
-    if (worst >= 70) return "sleepy";
-    if (worst >= 40) return "calm";
-    return "happy";
-  }
+  // shared, kept identical between the floating pet and the Dynamic Island
+  const { computeMode, fmtCd, drawPet } = window.PetCore;
 
   function drawFrame(t) {
-    const pal = SPRITES.palettes[character];
     const p = PARAMS[mode];
-    const animState =
-      p.anim === "auto" || p.anim === "walk"
+    const begging = t < begUntil;
+    const animState = begging ? "walk"
+      : p.anim === "auto" || p.anim === "walk"
         ? (walkActive ? "walk" : "idle")
         : p.anim;
-    const frames = SPRITES.frames[character][animState];
-    const fi = frameIdx % frames.length;
-    const frame = frames[fi];
-    ctx.clearRect(0, 0, 16, 16);
-    for (let y = 0; y < 16; y++) {
-      const row = frame[y];
-      for (let x = 0; x < 16; x++) {
-        const c = row[x];
-        if (c !== ".") {
-          ctx.fillStyle = pal[c];
-          ctx.fillRect(x, y, 1, 1);
-        }
-      }
-    }
-    if (animState !== "sleep" && t < blinkUntil) {
-      const dy = animState === "idle" && fi === 1 ? 1 : 0;
-      ctx.fillStyle = pal.d;
-      for (const [ex, ey] of SPRITES.eyes[character]) {
-        ctx.fillRect(ex, ey + dy, 1, 1);
-      }
-    }
+    drawPet(ctx, character, animState, frameIdx, !begging && t < blinkUntil);
   }
 
   function tick(t) {
     const dt = Math.min(0.05, (t - lastT) / 1000);
     lastT = t;
     const p = PARAMS[mode];
+    const begging = t < begUntil;   // depleted: frantically crawl & beg for tokens
 
-    if (p.anim === "auto") {
+    if (begging) {
+      walkActive = true;
+      if (t > nextBegFlip) { dir = Math.random() < 0.5 ? 1 : -1; nextBegFlip = t + 280 + Math.random() * 520; }
+    } else if (p.anim === "auto") {
       if (t > nextWalkDecision) {
         walkActive = Math.random() < 0.45;
         nextWalkDecision = t + 3500 + Math.random() * 3000;
@@ -137,11 +118,12 @@
     } else {
       walkActive = p.anim === "walk";
     }
-    if (paused) walkActive = false;
+    if (paused && !begging) walkActive = false;
 
-    // walking = move the whole window
-    if (!dragging && walkActive && p.speed > 0) {
-      moveAcc += dir * p.speed * dt;
+    // walking = move the whole window (frozen while a mini-game has resized it)
+    const effSpeed = begging ? BEG_SPEED : p.speed;
+    if (!dragging && walkActive && effSpeed > 0 && !window.__petGameActive) {
+      moveAcc += dir * effSpeed * dt;
       if (t - lastMoveSend > 90 && Math.abs(moveAcc) >= 1 && !moveInFlight) {
         const dx = moveAcc;
         moveAcc = 0;
@@ -157,10 +139,11 @@
 
     let jumpY = 0;
     if (t < celebrateUntil) jumpY = Math.abs(Math.sin(t / 85)) * 14;
+    else if (begging) jumpY = Math.abs(Math.sin(t / 70)) * 5;   // frantic little hops
     wrap.style.bottom = 2 + jumpY + "px";
     canvas.classList.toggle("flip", dir < 0 && walkActive);
 
-    if (t - lastSwap > p.frameMs) {
+    if (t - lastSwap > (begging ? 150 : p.frameMs)) {
       frameIdx = (frameIdx + 1) % 2;
       lastSwap = t;
     }
@@ -177,22 +160,6 @@
   }
 
   // ------------------------------------------------------------- hud
-  function fmtCd(iso) {
-    if (!iso) return null;
-    const ms = new Date(iso).getTime() - Date.now();
-    if (isNaN(ms)) return null;
-    if (ms <= 0) return "即将重置…";
-    const h = Math.floor(ms / 3600000);
-    const m = Math.floor((ms % 3600000) / 60000);
-    const local = new Date(iso).toLocaleString("zh-CN", {
-      month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
-    });
-    const cd = h >= 24 ? `${Math.floor(h / 24)} 天 ${h % 24} 小时`
-             : h > 0 ? `${h} 小时 ${String(m).padStart(2, "0")} 分`
-             : `${m} 分钟`;
-    return `${cd}后重置 · ${local}`;
-  }
-
   function setBar(fill, pctEl, lineEl, win) {
     if (!win) {
       fill.style.width = "0%";
@@ -216,16 +183,16 @@
 
     msgEl.classList.add("hidden");
     if (errorCode === "no-credentials") {
-      show(msgEl, "未找到 Claude Code 凭证 — 终端运行 claude 登录后点 ↻");
+      show(msgEl, t("err.noCreds"));
     } else if (errorCode === "auth") {
-      show(msgEl, "凭证过期 — 终端跑一条 claude 命令后点 ↻");
+      show(msgEl, t("err.auth"));
     } else if (errorCode === "rate-limit") {
-      show(msgEl, "🚦 " + (errorDetail || "请求太频繁，稍后自动重试"));
+      show(msgEl, "🚦 " + (errorDetail || t("err.rate")));
     } else if (errorCode) {
-      show(msgEl, "获取失败，稍后自动重试" + (errorDetail ? " · " + errorDetail.slice(0, 90) : ""));
+      show(msgEl, t("err.fetch") + (errorDetail ? " · " + errorDetail.slice(0, 90) : ""));
     } else if (mode === "depleted" && usage && usage.fiveHour) {
       const cd = fmtCd(usage.fiveHour.resetsAt);
-      show(msgEl, "额度用完啦 💤 " + (cd || ""));
+      show(msgEl, t("msg.depleted") + " " + (cd || ""));
     }
   }
   function show(el, text) {
@@ -237,7 +204,7 @@
   function refreshBubble() {
     clearTimeout(bubbleTimer);
     if (mode === "depleted" || mode === "lost") {
-      bubble.textContent = mode === "lost" ? "?" : "Zzz…";
+      bubble.textContent = mode === "lost" ? "?" : t("bubble.zzz");
       bubble.classList.remove("hidden");
     } else {
       bubble.classList.add("hidden");
@@ -263,7 +230,7 @@
 
   function applyState() {
     const prev = mode;
-    mode = computeMode();
+    mode = computeMode(usage, errorCode);
     if (prev !== mode) {
       frameIdx = 0;
       refreshBubble();
@@ -275,7 +242,7 @@
   // transparent areas pass clicks to whatever is behind the pet
   let ignoring = null;
   document.addEventListener("mousemove", (e) => {
-    if (dragging) return;
+    if (dragging || window.__petGameActive) return;
     const el = document.elementFromPoint(e.clientX, e.clientY);
     const interactive = !!(el && el.closest("#pet-wrap, #hud, #bubble"));
     if (interactive === ignoring) {
@@ -286,6 +253,9 @@
   // initialize as ignoring nothing until first mousemove
   api.setIgnore(false);
   ignoring = false;
+  // let the games module restore a safe click-through state on exit (it bypasses
+  // this tracker via api.setIgnore directly, which would otherwise desync)
+  window.__petResetIgnore = () => { api.setIgnore(true); ignoring = true; };
 
   // ------------------------------------------------------------- hud hover
   let hudHide = null;
@@ -336,13 +306,22 @@
   // rapid-petting combo easter egg
   let comboCount = 0;
   let comboTimer = null;
+  //额度用完时点一下 → 满地爬着求 token
+  function startBeg() {
+    begUntil = performance.now() + 4500;
+    nextBegFlip = 0;
+    sayTemp(BEG, 4200);
+    spawnFx("🥺");
+  }
+
   function onPetClick() {
+    if (mode === "depleted" || mode === "lost") { startBeg(); return; }
     comboCount++;
     clearTimeout(comboTimer);
     comboTimer = setTimeout(() => (comboCount = 0), 2500);
     if (comboCount >= 5) {
       comboCount = 0;
-      sayTemp("别 rua 了别 rua 了!!", 2200);
+      sayTemp(COMBO, 2200);
       celebrateUntil = performance.now() + 1200;
       let n = 0;
       const t = setInterval(() => {
@@ -395,10 +374,11 @@
   document.getElementById("menu").addEventListener("click", () => api.showMenu());
   document.getElementById("feed").addEventListener("click", feedPet);
   document.getElementById("refresh").addEventListener("click", () => {
-    sayTemp("刷新中…", 1200);
+    sayTemp(t("game.refresh"), 1200);
     api.refresh();
   });
   document.getElementById("quit").addEventListener("click", () => api.quit());
+  document.getElementById("game").addEventListener("click", () => { if (window.PetGames) window.PetGames.open(); });
 
   // ------------------------------------------------------------- host events
   api.onUsage((d) => { usage = d; errorCode = null; applyState(); });
@@ -419,6 +399,7 @@
   api.onCharacter((c) => {
     if (CHARS.includes(c)) {
       character = c;
+      window.__petCharacter = c;
       frameIdx = 0;
       refreshHud();
     }
@@ -426,6 +407,17 @@
   api.onPetSize((n) => {
     wrap.style.width = n + "px";
     wrap.style.height = n + "px";
+  });
+  api.onOpenGame((k) => { if (window.PetGames) window.PetGames.open(k); });
+  api.onI18n((d) => {
+    window.I18N = d.dict; window.__lang = d.lang;
+    if (d.lines) { CLICK_LINES = d.lines.click; FEED_LINES = d.lines.feed; QUIPS = d.lines.quips; COMBO = d.lines.combo; BEG = d.lines.beg; }
+    if (window.applyI18n) window.applyI18n();
+    refreshHud(); refreshBubble();
+  });
+  api.onFeatures((f) => {
+    const g = document.getElementById("game");
+    if (g) g.style.display = (f && f.games) ? "" : "none";
   });
 
   setInterval(() => {

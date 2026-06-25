@@ -1,0 +1,85 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%;
+  background: #1c1c24; color: #e8e8f0;
+  font-family: -apple-system, "PingFang SC", "Segoe UI", sans-serif;
+  font-size: 13px; user-select: none; -webkit-user-select: none;
+}
+#app { padding: 18px 20px 22px; }
+
+header { margin-bottom: 8px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.sub { color: #9a9ab0; font-size: 12px; margin: 0; line-height: 1.5; }
+
+section { padding: 14px 0; border-top: 1px solid #2c2c38; }
+section:first-of-type { border-top: 0; }
+h2 { font-size: 12px; letter-spacing: 1px; color: #9a9ab0; margin: 0 0 9px; text-transform: uppercase; }
+
+/* segmented control */
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg.col { flex-direction: column; }
+.seg button {
+  flex: 1; min-width: 70px; padding: 8px 10px;
+  background: #26262f; color: #cfd0e0; border: 1px solid #3a3a4a;
+  border-radius: 9px; cursor: pointer; font: inherit;
+}
+.seg.col button { flex: none; text-align: left; }
+.seg button:hover { background: #2f2f3c; }
+.seg button.on { background: #3a5bd0; border-color: #3a5bd0; color: #fff; }
+
+/* toggles */
+.toggle { display: flex; align-items: center; gap: 12px; padding: 8px 0; cursor: pointer; }
+.toggle .tx { flex: 1; }
+.toggle b { display: block; font-weight: 600; }
+.toggle .d { display: block; color: #9a9ab0; font-size: 11px; margin-top: 2px; line-height: 1.45; }
+.toggle input { width: 18px; height: 18px; accent-color: #3a5bd0; cursor: pointer; }
+
+/* character grid */
+#char-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.char {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 4px; background: #26262f; border: 1px solid #3a3a4a;
+  border-radius: 10px; cursor: pointer; color: #cfd0e0; font: inherit;
+}
+.char:hover { background: #2f2f3c; }
+.char.on { border-color: #3a5bd0; background: #2b3358; }
+.char canvas { width: 32px; height: 32px; image-rendering: pixelated; }
+.char span { font-size: 11px; }
+
+/* achievements (medals) */
+#ach-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.medal { text-align: center; padding: 14px 8px; background: #26262f; border: 1px solid #3a3a4a; border-radius: 12px; }
+.medal .badge {
+  width: 56px; height: 56px; margin: 0 auto 8px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 27px;
+  background: #1c1c24; border: 2px solid #3a3a4a;
+}
+.medal.unlocked .badge {
+  border-color: #f0c24b;
+  background: radial-gradient(circle at 50% 32%, #ffe7a3, #d99a2e 72%);
+  box-shadow: 0 0 16px rgba(240, 194, 75, .55);
+}
+.medal.unlocked.m-game .badge {
+  border-color: #5ad6a0;
+  background: radial-gradient(circle at 50% 32%, #b6f3da, #2faf78 72%);
+  box-shadow: 0 0 16px rgba(90, 214, 160, .55);
+}
+.medal.locked .badge { opacity: .5; }
+.medal .m-title { font-weight: 700; font-size: 13px; }
+.medal.locked .m-title { color: #9a9ab0; }
+.medal .m-desc { font-size: 11px; color: #9a9ab0; margin: 2px 0 9px; }
+.medal .m-prog { height: 6px; background: rgba(255, 255, 255, .1); border-radius: 4px; overflow: hidden; }
+.medal .m-bar { height: 100%; width: 0; background: #f0c24b; border-radius: 4px; transition: width .4s; }
+.medal.m-game .m-bar { background: #5ad6a0; }
+.medal .m-num { font-size: 11px; color: #9a9ab0; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.medal.unlocked .m-num { color: #f0c24b; }
+.medal.unlocked.m-game .m-num { color: #5ad6a0; }
+
+footer { padding-top: 16px; }
+.primary {
+  width: 100%; padding: 11px; font: inherit; font-weight: 600; font-size: 14px;
+  background: #3a5bd0; color: #fff; border: 0; border-radius: 11px; cursor: pointer;
+}
+.primary:hover { background: #4a6be0; }
+
+.hidden { display: none !important; }

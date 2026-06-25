@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="boss.css">
+</head>
+<body>
+  <!-- ░░░ Terminal ░░░ -->
+  <section id="dg-terminal" class="disguise">
+    <div class="term-body"><div id="term-out"></div><span class="term-cursor">▋</span></div>
+  </section>
+
+  <!-- ░░░ Excel ░░░ -->
+  <section id="dg-excel" class="disguise">
+    <div class="xl-ribbon">
+      <span class="xl-logo">X</span>
+      <span class="xl-title">财务预算表_Q2_final.xlsx — Excel</span>
+      <span class="xl-tabs"><b>开始</b> 插入 页面布局 公式 数据 审阅 视图</span>
+    </div>
+    <div class="xl-formula"><span class="xl-cellref">F12</span><span class="xl-fx">=SUM(C2:C40)*1.06</span></div>
+    <div class="xl-grid-wrap"><table id="xl-grid"></table></div>
+    <div class="xl-sheets"><span class="active">工资表</span><span>预算</span><span>Q2汇总</span><span>+</span></div>
+    <div class="xl-status">就绪　　　　　　　平均值: 12,884　计数: 39　求和: 502,476　　　　　100%</div>
+  </section>
+
+  <!-- ░░░ Word ░░░ -->
+  <section id="dg-word" class="disguise">
+    <div class="wd-ribbon">
+      <span class="wd-logo">W</span>
+      <span class="wd-title">项目周报_第24周.docx — Word</span>
+      <span class="wd-tabs">文件 <b>开始</b> 插入 设计 布局 引用 邮件 审阅 视图</span>
+    </div>
+    <div class="wd-toolbar">宋体 ▾　小四 ▾　<b>B</b> <i>I</i> <u>U</u>　≣ ≡ ≢　1.5 倍行距</div>
+    <div class="wd-page-area">
+      <div class="wd-page" id="wd-page"></div>
+    </div>
+    <div class="wd-status">第 1 页，共 3 页　1,248 个字　中文(中国)　　　　　100%</div>
+  </section>
+
+  <!-- ░░░ Code editor (VS Code-ish) ░░░ -->
+  <section id="dg-code" class="disguise">
+    <div class="vs-top">
+      <span class="vs-dots"><i></i><i></i><i></i></span>
+      <span class="vs-tabs"><span class="active">usageClient.ts</span><span>pet.tsx</span><span>server.ts</span></span>
+    </div>
+    <div class="vs-main">
+      <div class="vs-side">
+        <div class="vs-side-h">资源管理器</div>
+        <div class="vs-tree" id="vs-tree"></div>
+      </div>
+      <div class="vs-editor"><pre id="vs-code"></pre></div>
+    </div>
+    <div class="vs-statusbar"><span>⎇ main</span><span>● 0  ⚠ 0</span><span class="vs-spacer"></span><span>TypeScript</span><span>UTF-8</span><span>Ln 64, Col 12</span></div>
+  </section>
+
+  <div id="boss-hint">连按三下 Esc 退出</div>
+
+  <script src="boss.js"></script>
+</body>
+</html>

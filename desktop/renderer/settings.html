@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1 id="title" data-i18n="set.title">设置</h1>
+      <p id="welcome-sub" class="sub hidden" data-i18n="set.welcomeSub"></p>
+    </header>
+
+    <section>
+      <h2 data-i18n="set.language">语言</h2>
+      <div class="seg" id="lang-seg">
+        <button data-val="system" data-i18n="set.followSystem">跟随系统</button>
+        <button data-val="zh">中文</button>
+        <button data-val="en">English</button>
+      </div>
+    </section>
+
+    <section>
+      <h2 data-i18n="set.features">功能</h2>
+      <label class="toggle">
+        <div class="tx"><b data-i18n="set.featUsage"></b><span class="d" data-i18n="set.featUsageSub"></span></div>
+        <input type="checkbox" id="feat-usage">
+      </label>
+      <label class="toggle">
+        <div class="tx"><b data-i18n="set.featGames"></b><span class="d" data-i18n="set.featGamesSub"></span></div>
+        <input type="checkbox" id="feat-games">
+      </label>
+      <label class="toggle">
+        <div class="tx"><b data-i18n="set.featBoss"></b><span class="d" data-i18n="set.featBossSub"></span></div>
+        <input type="checkbox" id="feat-boss">
+      </label>
+    </section>
+
+    <section id="sec-boss" class="hidden">
+      <h2 data-i18n="set.boss">老板键伪装</h2>
+      <div class="seg col" id="prof-seg">
+        <button data-val="dev" data-i18n="set.profDev"></button>
+        <button data-val="office" data-i18n="set.profOffice"></button>
+        <button data-val="all" data-i18n="set.profAll"></button>
+      </div>
+      <p class="sub" data-i18n="set.bossTrigger"></p>
+    </section>
+
+    <section>
+      <h2 data-i18n="set.displayMode">显示模式</h2>
+      <div class="seg" id="mode-seg">
+        <button data-val="island" data-i18n="set.island"></button>
+        <button data-val="float" data-i18n="set.float"></button>
+      </div>
+    </section>
+
+    <section>
+      <h2 data-i18n="set.character">形象</h2>
+      <div id="char-grid"></div>
+    </section>
+
+    <section id="sec-size">
+      <h2 data-i18n="set.size">宠物大小</h2>
+      <div class="seg" id="size-seg">
+        <button data-val="48" data-i18n="set.sizeS"></button>
+        <button data-val="64" data-i18n="set.sizeM"></button>
+        <button data-val="96" data-i18n="set.sizeL"></button>
+      </div>
+    </section>
+
+    <section>
+      <label class="toggle">
+        <div class="tx"><b data-i18n="set.autostart"></b></div>
+        <input type="checkbox" id="autostart">
+      </label>
+    </section>
+
+    <section>
+      <h2 data-i18n="set.achievements">成就</h2>
+      <div id="ach-grid"></div>
+    </section>
+
+    <footer>
+      <button id="done" class="primary" data-i18n="set.done">完成</button>
+    </footer>
+  </div>
+
+  <script src="sprites.js"></script>
+  <script src="petcore.js"></script>
+  <script src="i18n.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>
