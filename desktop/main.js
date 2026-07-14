@@ -7,6 +7,7 @@ const path = require("path");
 const fs = require("fs");
 const { readCredentials } = require("./lib/credentials");
 const { fetchUsage } = require("./lib/usageClient");
+const { collectOthers } = require("./lib/providers");
 const { createBossController, DEFAULT_DISGUISES } = require("./lib/bossKey");
 const { readNotch } = require("./lib/notch");
 const STR = require("./lib/strings");
@@ -45,6 +46,8 @@ let lastUsage = null;
 let dragTimer = null;
 let pollTimer = null;
 let prevFiveHourPct = null;
+let prevFablePct = null;     // Fable gets its own threshold reminders
+const FABLE_THRESHOLDS = [80, 95];
 let settings = {};
 let cooldownUntil = 0;       // persisted across restarts
 let lastRequestAt = 0;       // wall-clock of last actual network hit
@@ -69,6 +72,7 @@ function loadSettings() {
   if (settings.lastUsage && settings.lastUsageAt) {
     lastUsage = settings.lastUsage;
     prevFiveHourPct = lastUsage.fiveHour ? lastUsage.fiveHour.pct : null;
+    prevFablePct = lastUsage.fable ? lastUsage.fable.pct : null;
   }
 }
 function saveSettings() {
@@ -103,6 +107,59 @@ function broadcastI18n() {
 function featureFlags() {
   const f = settings.features || {};
   return { usage: f.usage !== false, games: !!f.games, boss: !!f.boss };
+}
+
+// which usage sources to poll: Claude on by default; Codex / OpenClaw(龙虾) /
+// custom JSON are opt-in from Settings
+function providerFlags() {
+  const p = settings.providers || {};
+  return {
+    claude: p.claude !== false,
+    codex: !!p.codex,
+    openclaw: !!p.openclaw,
+    custom: !!p.custom,
+    customPath: typeof p.customPath === "string" ? p.customPath.trim() : "",
+  };
+}
+
+// ---- custom pixel buddies (loved ones pixelated in Settings) ----
+const BUDDY_MAX = 8;
+function sanitizeCustomPets(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const p of list.slice(0, BUDDY_MAX)) {
+    try {
+      if (!p || typeof p !== "object") continue;
+      if (!/^buddy-[a-z0-9]{1,24}$/.test(String(p.id))) continue;
+      const name = String(p.name || "❤").slice(0, 12);
+      const palette = {};
+      let ok = true;
+      const entries = Object.entries(p.palette || {}).slice(0, 12);
+      if (!entries.length) continue;
+      for (const [k, v] of entries) {
+        if (!/^[a-z]$/.test(k) || !/^#[0-9a-fA-F]{6}$/.test(String(v))) { ok = false; break; }
+        palette[k] = String(v);
+      }
+      if (!ok) continue;
+      const frames = {};
+      for (const st of ["idle", "walk", "sleep"]) {
+        const fr = p.frames && p.frames[st];
+        if (!Array.isArray(fr) || fr.length < 1 || fr.length > 8) { ok = false; break; }
+        for (const f of fr) {
+          if (!Array.isArray(f) || f.length !== 16) { ok = false; break; }
+          for (const row of f) {
+            if (typeof row !== "string" || row.length !== 16 ||
+                ![...row].every((c) => c === "." || palette[c])) { ok = false; break; }
+          }
+          if (!ok) break;
+        }
+        if (!ok) break;
+        frames[st] = fr;
+      }
+      if (ok) out.push({ id: p.id, name, palette, frames });
+    } catch { /* drop invalid buddy */ }
+  }
+  return out;
 }
 
 // ---- achievements (彩蛋): 10 boss uses → 潜行大师, 10 game clears → 游戏达人
@@ -189,6 +246,8 @@ function createWindow() {
   win.webContents.on("did-finish-load", () => {
     broadcastI18n();
     sendToWin("features", featureFlags());
+    // custom pixel buddies must merge into SPRITES before the character is set
+    sendToWin("custom-pets", settings.customPets || []);
     sendToWin("character", settings.character || "cat");
     sendToWin("pet-size", settings.petSize || 64);
     if (mode === "island") {
@@ -242,6 +301,8 @@ function publicSettings() {
     petSize: settings.petSize || 64,
     profession: settings.profession || "all",
     features: featureFlags(),
+    providers: providerFlags(),
+    customPets: settings.customPets || [],
     onboarded: !!settings.onboarded,
     stats: statsNow(),
     achGoal: ACH_GOAL,
@@ -316,6 +377,21 @@ function applySettingsPatch(p) {
     sendToWin("features", featureFlags());
     trayChanged = true;
   }
+  if (p.providers !== undefined) {
+    settings.providers = { ...providerFlags(), ...p.providers };
+    // reflect the new sources promptly (Claude itself stays behind its
+    // MIN_REFRESH floor, so toggling checkboxes can't hammer the API)
+    if (featureFlags().usage && win) poll(true);
+  }
+  if (p.customPets !== undefined) {
+    settings.customPets = sanitizeCustomPets(p.customPets);
+    const ids = new Set(settings.customPets.map((x) => x.id));
+    if (String(settings.character || "").startsWith("buddy-") && !ids.has(settings.character)) {
+      settings.character = "cat";
+      sendToWin("character", "cat");
+    }
+    sendToWin("custom-pets", settings.customPets);
+  }
   saveSettings();
   if (p.uiMode !== undefined) setUiMode(p.uiMode); // recreates window + tray
   if (i18nChanged) broadcastI18n();
@@ -341,80 +417,109 @@ function scheduleNextPoll() {
   pollTimer = setTimeout(() => poll(), wait);
 }
 
+// reset celebration + Fable's dedicated threshold reminders (80% / 95%);
+// runs only on a FRESH Claude fetch so cached re-sends can't re-toast
+function checkClaudeNotifications(usage) {
+  const pct = usage.fiveHour ? usage.fiveHour.pct : null;
+  if (
+    prevFiveHourPct !== null && pct !== null &&
+    prevFiveHourPct >= 80 && pct <= prevFiveHourPct - 50
+  ) {
+    sendToWin("celebrate");
+    try { new Notification({ title: tr("app.name"), body: tr("celebrate.reset") }).show(); } catch { /* ignore */ }
+  }
+  if (pct !== null) prevFiveHourPct = pct;
+
+  const f = usage.fable ? usage.fable.pct : null;
+  if (f !== null && prevFablePct !== null) {
+    for (const th of FABLE_THRESHOLDS.slice().reverse()) {
+      if (prevFablePct < th && f >= th) {
+        const body = tr(th >= 95 ? "fable.warn95" : "fable.warn80")
+          .replace("{pct}", String(Math.round(f)));
+        try { new Notification({ title: tr("app.name"), body }).show(); } catch { /* ignore */ }
+        break; // one Fable toast per poll (the highest crossed threshold)
+      }
+    }
+    if (prevFablePct >= 80 && f <= prevFablePct - 50) {
+      sendToWin("celebrate");
+      try { new Notification({ title: tr("app.name"), body: tr("fable.reset") }).show(); } catch { /* ignore */ }
+    }
+  }
+  if (f !== null) prevFablePct = f;
+}
+
 // manual=true comes from the refresh button / menu
 async function poll(manual = false) {
   if (isQuitting || !win || win.isDestroyed()) return;
+  const flags = providerFlags();
+  // other agents (Codex / OpenClaw 龙虾 / custom JSON) poll in parallel with
+  // Claude; collectOthers never rejects and times out internally
+  const othersPromise = collectOthers(flags);
   const now = Date.now();
 
-  // still cooling down from a rate-limit? don't even try
-  if (now < cooldownUntil) {
-    const mins = Math.max(1, Math.ceil((cooldownUntil - now) / 60000));
-    sendToWin("usage-error", {
-      code: "rate-limit",
-      message: `被限流了，约 ${mins} 分钟后自动重试`,
-    });
-    scheduleNextPoll();
-    return;
-  }
-  // hard floor between requests — protects against spamming ↻
-  if (now - lastRequestAt < MIN_REFRESH_MS) {
-    if (manual && lastUsage) {
-      sendToWin("usage", { ...lastUsage, fetchedAt: settings.lastUsageAt || now });
+  let fresh = null;          // fresh Claude usage from THIS round
+  let claudeError = false;   // an error was already reported to the renderer
+
+  if (flags.claude) {
+    if (now < cooldownUntil) {
+      // still cooling down from a rate-limit? don't even try
+      const mins = Math.max(1, Math.ceil((cooldownUntil - now) / 60000));
+      sendToWin("usage-error", {
+        code: "rate-limit",
+        message: `被限流了，约 ${mins} 分钟后自动重试`,
+      });
+      claudeError = true;
+    } else if (now - lastRequestAt >= MIN_REFRESH_MS) {
+      lastRequestAt = now;
+      try {
+        const creds = await readCredentials();
+        if (!creds) {
+          sendToWin("usage-error", { code: "no-credentials" });
+          claudeError = true;
+        } else {
+          fresh = await fetchUsage(creds.accessToken);
+          // success — clear any backoff
+          backoffLevel = 0;
+          cooldownUntil = 0;
+        }
+      } catch (e) {
+        claudeError = true;
+        if (e && e.status === 429) {
+          // exponential backoff: 5 → 10 → 20 → 30(max) min
+          const base = e.retryAfter ? e.retryAfter * 1000 : BACKOFF_MIN_MS;
+          const backoff = Math.min(BACKOFF_MAX_MS, base * Math.pow(2, backoffLevel));
+          backoffLevel = Math.min(backoffLevel + 1, 4);
+          cooldownUntil = Date.now() + backoff;
+          persistRateState();
+          sendToWin("usage-error", {
+            code: "rate-limit",
+            message: `被限流了，约 ${Math.max(1, Math.ceil(backoff / 60000))} 分钟后自动重试`,
+          });
+        } else {
+          sendToWin("usage-error", {
+            code: e && e.status === 401 ? "auth" : "fetch",
+            message: String((e && e.message) || e),
+          });
+        }
+      }
     }
-    scheduleNextPoll();
-    return;
+    // else: under the manual-refresh floor — reuse cached Claude numbers below
   }
 
-  lastRequestAt = now;
-  try {
-    const creds = await readCredentials();
-    if (!creds) {
-      sendToWin("usage-error", { code: "no-credentials" });
-      scheduleNextPoll();
-      return;
-    }
-    const usage = await fetchUsage(creds.accessToken);
+  const others = await othersPromise;
 
-    // success — clear any backoff
-    backoffLevel = 0;
-    cooldownUntil = 0;
-    lastUsage = usage;
-    settings.lastUsage = usage;
+  if (!claudeError && !isQuitting) {
+    const base = fresh || (flags.claude && lastUsage
+      ? { fiveHour: lastUsage.fiveHour, week: lastUsage.week, weekOpus: lastUsage.weekOpus, fable: lastUsage.fable }
+      : { fiveHour: null, week: null, weekOpus: null, fable: null });
+    const merged = { ...base, others };
+    lastUsage = merged;
+    settings.lastUsage = merged;
     settings.lastUsageAt = Date.now();
     persistRateState();
     updateTrayTitle();
-
-    const pct = usage.fiveHour ? usage.fiveHour.pct : null;
-    if (
-      prevFiveHourPct !== null && pct !== null &&
-      prevFiveHourPct >= 80 && pct <= prevFiveHourPct - 50
-    ) {
-      sendToWin("celebrate");
-      new Notification({
-        title: "Claude Pet",
-        body: "🎉 5 小时额度已重置，宠物精神满满！",
-      }).show();
-    }
-    if (pct !== null) prevFiveHourPct = pct;
-    sendToWin("usage", { ...usage, fetchedAt: Date.now() });
-  } catch (e) {
-    if (e && e.status === 429) {
-      // exponential backoff: 5 → 10 → 20 → 30(max) min
-      const base = e.retryAfter ? e.retryAfter * 1000 : BACKOFF_MIN_MS;
-      const backoff = Math.min(BACKOFF_MAX_MS, base * Math.pow(2, backoffLevel));
-      backoffLevel = Math.min(backoffLevel + 1, 4);
-      cooldownUntil = Date.now() + backoff;
-      persistRateState();
-      sendToWin("usage-error", {
-        code: "rate-limit",
-        message: `被限流了，约 ${Math.max(1, Math.ceil(backoff / 60000))} 分钟后自动重试`,
-      });
-    } else {
-      sendToWin("usage-error", {
-        code: e && e.status === 401 ? "auth" : "fetch",
-        message: String((e && e.message) || e),
-      });
-    }
+    if (fresh) checkClaudeNotifications(fresh);
+    sendToWin("usage", { ...merged, fetchedAt: Date.now() });
   }
   scheduleNextPoll();
 }
@@ -424,11 +529,16 @@ function updateTrayTitle() {
   if (!tray) return;
   const pctTxt = lastUsage && lastUsage.fiveHour
     ? `${Math.round(lastUsage.fiveHour.pct)}%` : null;
+  const fableTxt = lastUsage && lastUsage.fable
+    ? `F✦${Math.round(lastUsage.fable.pct)}%` : null;
   // macOS shows text beside the tray icon; Windows/Linux only have a tooltip
   if (process.platform === "darwin") {
     tray.setTitle(pctTxt ? ` 🐾${pctTxt}` : " 🐾", { fontType: "monospacedDigit" });
   }
-  tray.setToolTip(pctTxt ? `Claude Pet · 5h ${pctTxt}` : "Claude Pet");
+  const parts = ["Claude Pet"];
+  if (pctTxt) parts.push(`5h ${pctTxt}`);
+  if (fableTxt) parts.push(fableTxt);
+  tray.setToolTip(parts.join(" · "));
 }
 
 function buildTray() {

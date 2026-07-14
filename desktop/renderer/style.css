@@ -103,6 +103,19 @@ html, body {
 }
 .bar-fill.warn { background-color: #e6b455; }
 .bar-fill.danger { background-color: #d9634f; }
+/* Fable — the Mythos-tier window gets its own violet accent */
+.bar-label.fable { color: #b39ddb; }
+.bar-fill.fable { background-color: #8e7cc3; }
+.bar-fill.fable.warn { background-color: #e6b455; }
+.bar-fill.fable.danger { background-color: #d9634f; }
+
+/* other agents (Codex / OpenClaw 龙虾 / custom) */
+.src-name {
+  margin-top: 6px;
+  color: #9a9ab0;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
 .bar-pct { width: 36px; text-align: right; font-variant-numeric: tabular-nums; font-size: 11px; }
 
 .reset-line {

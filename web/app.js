@@ -175,7 +175,9 @@
     }
 
     if (t - lastSwap > p.frameMs) {
-      frameIdx = (frameIdx + 1) % 2;
+      // % 8 is divisible by every state's frame count (2 or 4), and the
+      // draw path mods by frames.length again, so all cycles stay even
+      frameIdx = (frameIdx + 1) % 8;
       lastSwap = t;
     }
     if (t > nextBlink) {

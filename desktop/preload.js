@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("petAPI", {
   onBossShow: (cb) => ipcRenderer.on("boss-show", (_e, d) => cb(d)),
   onI18n: (cb) => ipcRenderer.on("i18n", (_e, d) => cb(d)),
   onFeatures: (cb) => ipcRenderer.on("features", (_e, d) => cb(d)),
+  onCustomPets: (cb) => ipcRenderer.on("custom-pets", (_e, d) => cb(d)),
   onSettingsInit: (cb) => ipcRenderer.on("settings-init", (_e, d) => cb(d)),
   moveBy: (dx) => ipcRenderer.invoke("move-by", dx),
   enterGameMode: (w, h) => ipcRenderer.send("enter-game-mode", w, h),

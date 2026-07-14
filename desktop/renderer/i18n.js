@@ -7,5 +7,6 @@
     const r = root || document;
     r.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = window.t(el.getAttribute("data-i18n")); });
     r.querySelectorAll("[data-i18n-title]").forEach((el) => { el.title = window.t(el.getAttribute("data-i18n-title")); });
+    r.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = window.t(el.getAttribute("data-i18n-ph")); });
   };
 })();

@@ -23,18 +23,33 @@ function pickWindow(obj) {
   return { pct: pct ?? 0, resetsAt };
 }
 
+// Fable/Mythos gets its own window in the usage payload; the exact key is
+// undocumented, so match any "fable"/"mythos" key at the top level or nested.
+function pickFable(obj) {
+  if (!obj || typeof obj !== "object") return null;
+  for (const k of Object.keys(obj)) {
+    if (/fable|mythos/i.test(k)) {
+      const w = pickWindow(obj[k]);
+      if (w) return w;
+    }
+  }
+  return null;
+}
+
 function normalize(raw) {
-  const out = { fiveHour: null, week: null, weekOpus: null, raw };
+  const out = { fiveHour: null, week: null, weekOpus: null, fable: null, raw };
   if (raw && typeof raw === "object") {
     out.fiveHour = pickWindow(raw.five_hour ?? raw.fiveHour ?? raw.session);
     out.week = pickWindow(raw.seven_day ?? raw.sevenDay ?? raw.weekly);
     out.weekOpus = pickWindow(raw.seven_day_opus ?? raw.seven_day_sonnet_4_5 ?? null);
+    out.fable = pickFable(raw);
     // some variants nest under "usage" / "limits" / arrays
     if (!out.fiveHour && !out.week) {
       const nest = raw.usage || raw.limits || raw.data;
       if (nest && typeof nest === "object" && !Array.isArray(nest)) {
         out.fiveHour = pickWindow(nest.five_hour ?? nest.session);
         out.week = pickWindow(nest.seven_day ?? nest.weekly);
+        if (!out.fable) out.fable = pickFable(nest);
       }
       if (Array.isArray(nest)) {
         for (const item of nest) {
@@ -42,6 +57,7 @@ function normalize(raw) {
           if (!w) continue;
           const key = String(item.type || item.window || item.name || "");
           if (/five|5h|session/i.test(key) && !out.fiveHour) out.fiveHour = w;
+          else if (/fable|mythos/i.test(key) && !out.fable) out.fable = w;
           else if (/opus/i.test(key) && !out.weekOpus) out.weekOpus = w;
           else if (/seven|week/i.test(key) && !out.week) out.week = w;
         }

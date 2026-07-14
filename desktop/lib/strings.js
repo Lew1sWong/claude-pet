@@ -30,6 +30,11 @@ const zh = {
   "bubble.zzz": "Zzz…",
   "celebrate.reset": "🎉 5 小时额度已重置，宠物精神满满！",
 
+  // Fable（Mythos 级模型）单独提醒
+  "fable.warn80": "✦ Fable 用量已到 {pct}% — 顶级模型烧得快，注意分配哦",
+  "fable.warn95": "‼️ Fable 用量已到 {pct}%，马上见底了！",
+  "fable.reset": "✦ Fable 额度重置啦，可以继续放心用！",
+
   // countdown (used by fmtCd)
   "cd.soon": "即将重置…",
   "cd.day": "天",
@@ -68,6 +73,31 @@ const zh = {
   "set.autostart": "开机自动启动",
   "set.start": "开始使用",
   "set.done": "完成",
+
+  // usage data sources
+  "set.sources": "用量数据源",
+  "set.srcClaude": "Claude",
+  "set.srcClaudeSub": "Claude Code / claude.ai 订阅额度（含 Fable ✦ 单独提醒）",
+  "set.srcCodex": "Codex",
+  "set.srcCodexSub": "OpenAI Codex CLI — 本地读取，无需登录",
+  "set.srcOpenclaw": "OpenClaw 龙虾 🦞",
+  "set.srcOpenclawSub": "读取 OpenClaw 的凭证查询其额度（尽力而为）",
+  "set.srcCustom": "自定义 JSON",
+  "set.srcCustomSub": "任何 agent 都能接入：指向一个 JSON 文件或 URL",
+  "set.srcCustomPh": "/path/usage.json 或 https://…",
+  "set.srcCustomHint": '格式：{"label":"My Agent","windows":[{"label":"day","pct":42,"resetsAt":"ISO时间"}]}，也可以是数组一次接入多个',
+
+  // pixel buddy（像素亲友）
+  "set.buddy": "像素伙伴",
+  "set.buddySub": "把你爱的家人、朋友、毛孩子做成像素小人，陪你一起工作 ❤️ 选一张清晰的正面照效果最好",
+  "set.buddyPick": "📷 选择照片…",
+  "set.buddyName": "名字",
+  "set.buddyNamePh": "比如：妈妈 / 阿黄",
+  "set.buddyAdd": "✨ 生成像素伙伴",
+  "set.buddyDel": "删除",
+  "set.buddyFull": "最多 8 个伙伴啦",
+  "set.buddyDone": "已加入！去「形象」里选 TA 吧",
+  "set.buddyErr": "识别不到主体 😢 换一张主体和背景对比明显的照片试试",
 
   // games
   "game.menuTitle": "玩一会儿 ~",
@@ -134,6 +164,10 @@ const en = {
   "bubble.zzz": "Zzz…",
   "celebrate.reset": "🎉 5-hour quota reset — the pet's recharged!",
 
+  "fable.warn80": "✦ Fable usage hit {pct}% — the Mythos tier burns fast, pace yourself",
+  "fable.warn95": "‼️ Fable usage at {pct}% — almost dry!",
+  "fable.reset": "✦ Fable quota reset — full speed ahead!",
+
   "cd.soon": "resetting…",
   "cd.day": "d",
   "cd.hour": "h",
@@ -170,6 +204,29 @@ const en = {
   "set.autostart": "Launch at login",
   "set.start": "Get started",
   "set.done": "Done",
+
+  "set.sources": "Usage sources",
+  "set.srcClaude": "Claude",
+  "set.srcClaudeSub": "Claude Code / claude.ai subscription quota (with a dedicated Fable ✦ reminder)",
+  "set.srcCodex": "Codex",
+  "set.srcCodexSub": "OpenAI Codex CLI — read locally, no login needed",
+  "set.srcOpenclaw": "OpenClaw 🦞",
+  "set.srcOpenclawSub": "Reads OpenClaw's credentials to query its quota (best-effort)",
+  "set.srcCustom": "Custom JSON",
+  "set.srcCustomSub": "Hook up ANY agent: point at a JSON file or URL",
+  "set.srcCustomPh": "/path/usage.json or https://…",
+  "set.srcCustomHint": 'Format: {"label":"My Agent","windows":[{"label":"day","pct":42,"resetsAt":"ISO"}]} — or an array for several agents',
+
+  "set.buddy": "Pixel buddy",
+  "set.buddySub": "Turn the people (and pets) you love into a pixel pal that keeps you company while you work ❤️ A clear front-facing photo works best",
+  "set.buddyPick": "📷 Pick a photo…",
+  "set.buddyName": "Name",
+  "set.buddyNamePh": "e.g. Mom / Buddy",
+  "set.buddyAdd": "✨ Make pixel buddy",
+  "set.buddyDel": "Delete",
+  "set.buddyFull": "8 buddies max!",
+  "set.buddyDone": "Added! Pick them under “Character”",
+  "set.buddyErr": "Couldn't find a subject 😢 — try a photo with clearer contrast",
 
   "game.menuTitle": "Play a bit ~",
   "game.catch": "Catch",
@@ -237,6 +294,11 @@ const lines = {
     combo: "别 rua 了别 rua 了!!",
     beg: "求求你🥺给点纯血 token 吧～",
     reset: "额度重置啦!! ✦",
+    micro: { yawn: "哈啊~ 有点困…", stretch: "唔~ 伸个懒腰!" },
+    buddy: {
+      click: ["陪你工作~", "加油加油!", "想我了吗?", "❤"],
+      feed: ["谢谢~ 你也要好好吃饭!", "啊呜~ 一起补充能量!"],
+    },
   },
   en: {
     click: {
@@ -266,6 +328,11 @@ const lines = {
     combo: "stop poking meee!!",
     beg: "pls🥺 spare some pure-blood tokens~",
     reset: "Quota reset!! ✦",
+    micro: { yawn: "yaaawn… sleepy", stretch: "mmm~ big stretch!" },
+    buddy: {
+      click: ["here with you~", "you got this!", "miss me?", "❤"],
+      feed: ["thanks~ eat well too!", "nom~ recharging together!"],
+    },
   },
 };
 

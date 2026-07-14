@@ -6,7 +6,7 @@
   const api = window.petAPI;
   const t = window.t;   // i18n lookup (reads window.I18N live)
 
-  const CHARS = Object.keys(SPRITES.frames);
+  const charsNow = () => Object.keys(SPRITES.frames);
   let character = "cat";
 
   // ------------------------------------------------------------- dom
@@ -23,6 +23,11 @@
   const pctw = document.getElementById("pctw");
   const reset5 = document.getElementById("reset5");
   const resetw = document.getElementById("resetw");
+  const rowFable = document.getElementById("row-fable");
+  const barf = document.getElementById("barf");
+  const pctf = document.getElementById("pctf");
+  const resetf = document.getElementById("resetf");
+  const othersEl = document.getElementById("others");
 
   // ------------------------------------------------------------- state
   let usage = null;
@@ -46,6 +51,10 @@
   let begUntil = 0;       // depleted-state "give me tokens" frantic crawl
   let nextBegFlip = 0;
   const BEG_SPEED = 64;
+  let curAnim = "idle";   // resolved animation state, drives frame count & draw
+  let microState = null;  // idle micro-animation: "yawn" | "stretch"
+  let microUntil = 0;
+  let nextMicro = performance.now() + 12000 + Math.random() * 15000;
 
   const PARAMS = {
     happy:    { anim: "walk",  frameMs: 280, speed: 26 },
@@ -86,19 +95,20 @@
   };
   let COMBO = "别 rua 了别 rua 了!!";
   let BEG = "求求你🥺给点纯血 token 吧～";
+  let MICRO_LINES = { yawn: "哈啊~ 有点困…", stretch: "唔~ 伸个懒腰!" };
+  // custom pixel buddies (loved ones) have no per-character lines; use these
+  let BUDDY_LINES = {
+    click: ["陪你工作~", "加油加油!", "想我了吗?", "❤"],
+    feed: ["谢谢~ 你也要好好吃饭!", "啊呜~ 一起补充能量!"],
+  };
 
   // ------------------------------------------------------------- pet brain
   // shared, kept identical between the floating pet and the Dynamic Island
-  const { computeMode, fmtCd, drawPet } = window.PetCore;
+  const { computeMode, fmtCd, drawPet, frameCount, mergeCustomPets, renderOthers } = window.PetCore;
 
   function drawFrame(t) {
-    const p = PARAMS[mode];
     const begging = t < begUntil;
-    const animState = begging ? "walk"
-      : p.anim === "auto" || p.anim === "walk"
-        ? (walkActive ? "walk" : "idle")
-        : p.anim;
-    drawPet(ctx, character, animState, frameIdx, !begging && t < blinkUntil);
+    drawPet(ctx, character, curAnim, frameIdx, !begging && t < blinkUntil);
   }
 
   function tick(t) {
@@ -107,9 +117,27 @@
     const p = PARAMS[mode];
     const begging = t < begUntil;   // depleted: frantically crawl & beg for tokens
 
+    // idle micro-animations: every so often the pet stops to yawn or stretch.
+    // Sleepy pets yawn more; sleeping/lost pets are already lying down.
+    const canMicro = !begging && !dragging &&
+      mode !== "depleted" && mode !== "lost" && t >= celebrateUntil;
+    if (canMicro && t > nextMicro) {
+      microState = Math.random() < (mode === "sleepy" ? 0.72 : 0.42) ? "yawn" : "stretch";
+      microUntil = t + 2800;
+      nextMicro = t + 20000 + Math.random() * 30000;
+      frameIdx = 0;
+      const lines = MICRO_LINES[microState];
+      if (lines && Math.random() < 0.35) sayTemp(lines, 2400);
+      if (microState === "yawn" && mode === "sleepy") spawnFx("💤");
+    }
+    const microing = canMicro && t < microUntil && microState;
+    if (!microing) microState = null;
+
     if (begging) {
       walkActive = true;
       if (t > nextBegFlip) { dir = Math.random() < 0.5 ? 1 : -1; nextBegFlip = t + 280 + Math.random() * 520; }
+    } else if (microing) {
+      walkActive = false;
     } else if (p.anim === "auto") {
       if (t > nextWalkDecision) {
         walkActive = Math.random() < 0.45;
@@ -119,6 +147,12 @@
       walkActive = p.anim === "walk";
     }
     if (paused && !begging) walkActive = false;
+
+    curAnim = begging ? "walk"
+      : microing ? microState
+        : p.anim === "auto" || p.anim === "walk"
+          ? (walkActive ? "walk" : "idle")
+          : p.anim;
 
     // walking = move the whole window (frozen while a mini-game has resized it)
     const effSpeed = begging ? BEG_SPEED : p.speed;
@@ -143,8 +177,9 @@
     wrap.style.bottom = 2 + jumpY + "px";
     canvas.classList.toggle("flip", dir < 0 && walkActive);
 
-    if (t - lastSwap > (begging ? 150 : p.frameMs)) {
-      frameIdx = (frameIdx + 1) % 2;
+    const swapMs = begging ? 150 : microing ? 700 : p.frameMs;
+    if (t - lastSwap > swapMs) {
+      frameIdx = (frameIdx + 1) % frameCount(character, curAnim);
       lastSwap = t;
     }
     if (t > nextBlink) {
@@ -179,6 +214,12 @@
   function refreshHud() {
     setBar(bar5, pct5, reset5, usage && usage.fiveHour);
     setBar(barw, pctw, resetw, usage && usage.week);
+    // Fable gets its own bar — the priciest window deserves its own warning
+    const fable = usage && usage.fable;
+    rowFable.classList.toggle("hidden", !fable);
+    resetf.classList.toggle("hidden", !fable);
+    if (fable) setBar(barf, pctf, resetf, fable);
+    renderOthers(othersEl, usage && usage.others);
     nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
 
     msgEl.classList.add("hidden");
@@ -330,13 +371,13 @@
       }, 120);
       return;
     }
-    const lines = CLICK_LINES[character] || ["♥"];
+    const lines = CLICK_LINES[character] || BUDDY_LINES.click;
     sayTemp(lines[Math.floor(Math.random() * lines.length)]);
     spawnFx("♥");
   }
 
   function feedPet() {
-    const lines = FEED_LINES[character] || ["啊呜~"];
+    const lines = FEED_LINES[character] || BUDDY_LINES.feed;
     sayTemp(lines[Math.floor(Math.random() * lines.length)], 2200);
     celebrateUntil = performance.now() + 1100;
     let n = 0;
@@ -366,8 +407,9 @@
 
   // ------------------------------------------------------------- buttons
   function switchCharacter(step) {
-    const i = (CHARS.indexOf(character) + step + CHARS.length) % CHARS.length;
-    api.setCharacter(CHARS[i]); // main saves & broadcasts back
+    const chars = charsNow();
+    const i = (chars.indexOf(character) + step + chars.length) % chars.length;
+    api.setCharacter(chars[i]); // main saves & broadcasts back
   }
   document.getElementById("prev").addEventListener("click", () => switchCharacter(-1));
   document.getElementById("next").addEventListener("click", () => switchCharacter(1));
@@ -397,12 +439,17 @@
     }, 300);
   });
   api.onCharacter((c) => {
-    if (CHARS.includes(c)) {
+    if (charsNow().includes(c)) {
       character = c;
       window.__petCharacter = c;
       frameIdx = 0;
       refreshHud();
     }
+  });
+  api.onCustomPets((list) => {
+    mergeCustomPets(list);
+    if (!charsNow().includes(character)) { character = "cat"; frameIdx = 0; }
+    refreshHud();
   });
   api.onPetSize((n) => {
     wrap.style.width = n + "px";
@@ -411,7 +458,12 @@
   api.onOpenGame((k) => { if (window.PetGames) window.PetGames.open(k); });
   api.onI18n((d) => {
     window.I18N = d.dict; window.__lang = d.lang;
-    if (d.lines) { CLICK_LINES = d.lines.click; FEED_LINES = d.lines.feed; QUIPS = d.lines.quips; COMBO = d.lines.combo; BEG = d.lines.beg; }
+    if (d.lines) {
+      CLICK_LINES = d.lines.click; FEED_LINES = d.lines.feed; QUIPS = d.lines.quips;
+      COMBO = d.lines.combo; BEG = d.lines.beg;
+      if (d.lines.micro) MICRO_LINES = d.lines.micro;
+      if (d.lines.buddy) BUDDY_LINES = d.lines.buddy;
+    }
     if (window.applyI18n) window.applyI18n();
     refreshHud(); refreshBubble();
   });
@@ -424,6 +476,7 @@
     if (usage) {
       setBar(bar5, pct5, reset5, usage.fiveHour);
       setBar(barw, pctw, resetw, usage.week);
+      if (usage.fable) setBar(barf, pctf, resetf, usage.fable);
     }
   }, 1000);
 

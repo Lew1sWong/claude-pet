@@ -17,3 +17,4 @@ settings.json
 **/.credentials.json
 .env
 *.local
+__pycache__/

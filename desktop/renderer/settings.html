@@ -36,6 +36,30 @@
       </label>
     </section>
 
+    <section id="sec-sources">
+      <h2 data-i18n="set.sources">用量数据源</h2>
+      <label class="toggle">
+        <div class="tx"><b data-i18n="set.srcClaude"></b><span class="d" data-i18n="set.srcClaudeSub"></span></div>
+        <input type="checkbox" id="prov-claude">
+      </label>
+      <label class="toggle">
+        <div class="tx"><b data-i18n="set.srcCodex"></b><span class="d" data-i18n="set.srcCodexSub"></span></div>
+        <input type="checkbox" id="prov-codex">
+      </label>
+      <label class="toggle">
+        <div class="tx"><b data-i18n="set.srcOpenclaw"></b><span class="d" data-i18n="set.srcOpenclawSub"></span></div>
+        <input type="checkbox" id="prov-openclaw">
+      </label>
+      <label class="toggle">
+        <div class="tx"><b data-i18n="set.srcCustom"></b><span class="d" data-i18n="set.srcCustomSub"></span></div>
+        <input type="checkbox" id="prov-custom">
+      </label>
+      <div id="custom-src" class="hidden">
+        <input type="text" id="prov-custom-path" class="txt" data-i18n-ph="set.srcCustomPh" spellcheck="false">
+        <p class="sub" data-i18n="set.srcCustomHint"></p>
+      </div>
+    </section>
+
     <section id="sec-boss" class="hidden">
       <h2 data-i18n="set.boss">老板键伪装</h2>
       <div class="seg col" id="prof-seg">
@@ -57,6 +81,23 @@
     <section>
       <h2 data-i18n="set.character">形象</h2>
       <div id="char-grid"></div>
+    </section>
+
+    <section>
+      <h2 data-i18n="set.buddy">像素伙伴</h2>
+      <p class="sub" data-i18n="set.buddySub"></p>
+      <div id="buddy-maker">
+        <button id="buddy-pick" data-i18n="set.buddyPick">📷 选择照片…</button>
+        <input type="file" id="buddy-file" accept="image/*" hidden>
+        <div id="buddy-preview" class="hidden">
+          <canvas id="buddy-canvas" width="16" height="16"></canvas>
+          <div class="buddy-fields">
+            <input type="text" id="buddy-name" class="txt" maxlength="12" data-i18n-ph="set.buddyNamePh">
+            <button id="buddy-add" data-i18n="set.buddyAdd">✨ 生成像素伙伴</button>
+          </div>
+        </div>
+        <p id="buddy-msg" class="sub hidden"></p>
+      </div>
     </section>
 
     <section id="sec-size">

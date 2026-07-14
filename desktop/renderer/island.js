@@ -6,9 +6,9 @@
   "use strict";
   const api = window.petAPI;
   const t = window.t;   // i18n lookup (reads window.I18N live)
-  const { computeMode, fmtCd, drawPet } = window.PetCore;
+  const { computeMode, fmtCd, drawPet, frameCount, mergeCustomPets, renderOthers } = window.PetCore;
 
-  const CHARS = Object.keys(SPRITES.frames);
+  const charsNow = () => Object.keys(SPRITES.frames);
   let character = "cat";
 
   // ------------------------------------------------------------- dom
@@ -25,6 +25,11 @@
   const pctw = document.getElementById("pctw");
   const reset5 = document.getElementById("reset5");
   const resetw = document.getElementById("resetw");
+  const rowFable = document.getElementById("row-fable");
+  const barf = document.getElementById("barf");
+  const pctf = document.getElementById("pctf");
+  const resetf = document.getElementById("resetf");
+  const othersEl = document.getElementById("others");
 
   // ------------------------------------------------------------- state
   let usage = null;
@@ -70,23 +75,55 @@
   };
   let COMBO = "别 rua 了别 rua 了!!";
   let RESET_LINE = "额度重置啦!! ✦";
+  // custom pixel buddies (loved ones) fall back to these lines
+  let BUDDY_LINES = {
+    click: ["陪你工作~", "加油加油!", "想我了吗?", "❤"],
+    feed: ["谢谢~ 你也要好好吃饭!", "啊呜~ 一起补充能量!"],
+  };
 
   // ------------------------------------------------------------- pet animation
+  let microState = null;   // idle micro-animation: "yawn" | "stretch"
+  let microUntil = 0;
+  let nextMicro = performance.now() + 15000 + Math.random() * 15000;
+
   function tick(t) {
     lastT = t;
     const a = ANIM[mode] || ANIM.unknown;
-    if (t - lastSwap > a.frameMs) { frameIdx = (frameIdx + 1) % 2; lastSwap = t; }
+
+    // occasionally stop to yawn / stretch (never while asleep or celebrating)
+    if (a.state !== "sleep" && t >= celebrateUntil && t > nextMicro) {
+      microState = Math.random() < (mode === "sleepy" ? 0.72 : 0.42) ? "yawn" : "stretch";
+      microUntil = t + 2800;
+      nextMicro = t + 22000 + Math.random() * 30000;
+      frameIdx = 0;
+    }
+    const microing = a.state !== "sleep" && t < microUntil && microState;
+    if (!microing) microState = null;
+
+    const state = microing ? microState : a.state;
+    const frameMs = microing ? 700 : a.frameMs;
+    if (t - lastSwap > frameMs) { frameIdx = (frameIdx + 1) % frameCount(character, state); lastSwap = t; }
     if (t > nextBlink) { blinkUntil = t + 160; nextBlink = t + 2200 + Math.random() * 3500; }
 
-    let bob = a.state === "sleep" ? 0 : Math.sin(t / 420) * 1.2;
+    let bob = state === "sleep" || microing ? 0 : Math.sin(t / 420) * 1.2;
     if (t < celebrateUntil) bob = -Math.abs(Math.sin(t / 85)) * 6;
     canvas.style.transform = `translateY(${bob.toFixed(2)}px)`;
 
-    drawPet(ctx, character, a.state, frameIdx, t < blinkUntil);
+    drawPet(ctx, character, state, frameIdx, t < blinkUntil);
   }
   function rafLoop(t) { tick(t); requestAnimationFrame(rafLoop); }
 
   // ------------------------------------------------------------- usage / hud
+  // grow the expanded capsule to fit extra rows (Fable / other agents),
+  // capped just under the 360px host window
+  function fitExpanded() {
+    const body = document.querySelector(".body");
+    if (!body) return;
+    const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bar-h")) || 32;
+    const h = Math.max(300, Math.min(352, barH + body.scrollHeight + 6));
+    document.documentElement.style.setProperty("--expanded-h", h + "px");
+  }
+
   function setBar(fill, pctEl, lineEl, win) {
     if (!win) { fill.style.width = "0%"; pctEl.textContent = "--%"; lineEl.textContent = ""; return; }
     const pct = Math.round(win.pct);
@@ -110,6 +147,12 @@
   function refreshBody() {
     setBar(bar5, pct5, reset5, usage && usage.fiveHour);
     setBar(barw, pctw, resetw, usage && usage.week);
+    const fable = usage && usage.fable;
+    rowFable.classList.toggle("hidden", !fable);
+    resetf.classList.toggle("hidden", !fable);
+    if (fable) setBar(barf, pctf, resetf, fable);
+    renderOthers(othersEl, usage && usage.others);
+    fitExpanded();
     nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
     msgEl.classList.add("hidden");
     if (errorCode === "no-credentials") show(msgEl, t("err.noCreds"));
@@ -233,14 +276,14 @@
       const t = setInterval(() => { spawnFx("♥"); if (++n > 6) clearInterval(t); }, 120);
       return;
     }
-    const lines = CLICK_LINES[character] || ["♥"];
+    const lines = CLICK_LINES[character] || BUDDY_LINES.click;
     sayTemp(lines[Math.floor(Math.random() * lines.length)]);
     spawnFx("♥");
   }
   canvas.addEventListener("click", onPetClick);
 
   function feedPet() {
-    const lines = FEED_LINES[character] || ["啊呜~"];
+    const lines = FEED_LINES[character] || BUDDY_LINES.feed;
     sayTemp(lines[Math.floor(Math.random() * lines.length)], 2200);
     celebrateUntil = performance.now() + 1100;
     let n = 0;
@@ -248,8 +291,9 @@
   }
 
   function switchCharacter(step) {
-    const i = (CHARS.indexOf(character) + step + CHARS.length) % CHARS.length;
-    api.setCharacter(CHARS[i]); // main saves & broadcasts back
+    const chars = charsNow();
+    const i = (chars.indexOf(character) + step + chars.length) % chars.length;
+    api.setCharacter(chars[i]); // main saves & broadcasts back
   }
   document.getElementById("prev").addEventListener("click", () => switchCharacter(-1));
   document.getElementById("next").addEventListener("click", () => switchCharacter(1));
@@ -285,7 +329,12 @@
     const t = setInterval(() => { spawnFx(["✦", "★", "♥"][n % 3]); if (++n > 7) clearInterval(t); }, 300);
   });
   api.onCharacter((c) => {
-    if (CHARS.includes(c)) { character = c; window.__petCharacter = c; frameIdx = 0; refreshBody(); }
+    if (charsNow().includes(c)) { character = c; window.__petCharacter = c; frameIdx = 0; refreshBody(); }
+  });
+  api.onCustomPets((list) => {
+    mergeCustomPets(list);
+    if (!charsNow().includes(character)) { character = "cat"; frameIdx = 0; }
+    refreshBody();
   });
   api.onGeometry((g) => {
     if (!g) return;
@@ -296,7 +345,10 @@
   api.onOpenGame((k) => { if (window.PetGames) window.PetGames.open(k); });
   api.onI18n((d) => {
     window.I18N = d.dict; window.__lang = d.lang;
-    if (d.lines) { CLICK_LINES = d.lines.click; FEED_LINES = d.lines.feed; COMBO = d.lines.combo; RESET_LINE = d.lines.reset; }
+    if (d.lines) {
+      CLICK_LINES = d.lines.click; FEED_LINES = d.lines.feed; COMBO = d.lines.combo; RESET_LINE = d.lines.reset;
+      if (d.lines.buddy) BUDDY_LINES = d.lines.buddy;
+    }
     if (window.applyI18n) window.applyI18n();
     refreshMini(); refreshBody(); refreshBubble();
   });
@@ -307,7 +359,11 @@
 
   // keep countdowns live
   setInterval(() => {
-    if (usage) { setBar(bar5, pct5, reset5, usage.fiveHour); setBar(barw, pctw, resetw, usage.week); }
+    if (usage) {
+      setBar(bar5, pct5, reset5, usage.fiveHour);
+      setBar(barw, pctw, resetw, usage.week);
+      if (usage.fable) setBar(barf, pctf, resetf, usage.fable);
+    }
   }, 1000);
 
   applyState();

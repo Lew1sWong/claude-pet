@@ -42,6 +42,35 @@ BODY     = "..." + "o" * 10 + "..."                                # cols3-12
 BELLY    = "..." + "oo" + "cccccc" + "oo" + "..."
 FEET_A   = "...." + "oo" + "...." + "oo" + "...."
 FEET_B   = "....." + "oo" + ".." + "oo" + "....."
+# asymmetric step poses for the 4-frame walk gait
+FEET_L   = "..." + "oo" + "...." + "oo" + "....."                  # left pair forward
+FEET_R   = "....." + "oo" + "...." + "oo" + "..."                  # right pair forward
+
+def walk_cycle(pose_a, pose_b, feet_l, feet_mid, feet_r):
+    """4-frame gait: step L → feet together (body dips 1px) → step R → dip.
+    pose_a/pose_b are the two body variants (tail swish etc.)."""
+    return [
+        pose_a + [feet_l, E],
+        shift_down(pose_a + [feet_mid, E]),
+        pose_b + [feet_r, E],
+        shift_down(pose_b + [feet_mid, E]),
+    ]
+
+def yawn_frames(base, feet,
+                eye_cols=(4, 5, 10, 11), eye_rows=(4, 5),
+                mouth_cols=(7, 8), mouth_rows=(6, 7)):
+    """Eyes squeeze shut, mouth opens small → wide (head dips on the big one)."""
+    closed = put(base, [(x, eye_rows[0]) for x in eye_cols], "o")
+    closed = put(closed, [(x, eye_rows[1]) for x in eye_cols], "d")
+    small = put(closed, [(x, mouth_rows[1]) for x in mouth_cols], "k")
+    big = put(closed, [(x, y) for x in mouth_cols for y in mouth_rows], "k")
+    return [small + [feet, E], shift_down(big + [feet, E])]
+
+def stretch_frames(base, feet_a, feet_tip):
+    """Paws reach out sideways, then up beside the cheeks on tiptoe."""
+    a = put(base, [(1, 9), (2, 9), (13, 9), (14, 9)], "o")
+    b = put(base, [(1, 7), (1, 8), (14, 7), (14, 8)], "o")
+    return [a + [feet_a, E], b + [feet_tip, E]]
 
 def sleep_frames(ears_left, ears_right, nose=None):
     """Lying blob, head right. ears_* are 1-2 px wide strings."""
@@ -86,8 +115,10 @@ cat_b = put(cat_base, [(14, 11), (14, 12), (15, 10), (13, 13)], "o")   # tail fl
 
 F["cat"] = {
     "idle": [cat_a + [FEET_A, E], shift_down(cat_b + [FEET_A, E])],
-    "walk": [cat_a + [FEET_A, E], cat_b + [FEET_B, E]],
+    "walk": walk_cycle(cat_a, cat_b, FEET_L, FEET_B, FEET_R),
     "sleep": sleep_frames("o.", ".o"),
+    "yawn": yawn_frames(cat_a, FEET_A),
+    "stretch": stretch_frames(cat_a, FEET_A, FEET_B),
 }
 
 # ---------------------------------------------------------------- DOG
@@ -113,8 +144,10 @@ dog_b = put(dog_b, [(13, 9)], "c")
 
 F["dog"] = {
     "idle": [dog_a + [FEET_A, E], shift_down(dog_b + [FEET_A, E])],
-    "walk": [dog_a + [FEET_A, E], dog_b + [FEET_B, E]],
+    "walk": walk_cycle(dog_a, dog_b, FEET_L, FEET_B, FEET_R),
     "sleep": sleep_frames("oo", "oo", nose=(12, 11)),
+    "yawn": yawn_frames(dog_a, FEET_A),
+    "stretch": stretch_frames(dog_a, FEET_A, FEET_B),
 }
 
 # ---------------------------------------------------------------- BEAR
@@ -122,6 +155,8 @@ BEAR_BODY  = ".." + "o" * 12 + ".."
 BEAR_BELLY = ".." + "ooo" + "cccccc" + "ooo" + ".."
 BEAR_FEET_A = "..." + "ooo" + "...." + "ooo" + "..."
 BEAR_FEET_B = "...." + "ooo" + ".." + "ooo" + "...."
+BEAR_FEET_L = ".." + "ooo" + "..." + "ooo" + "....."
+BEAR_FEET_R = "....." + "ooo" + "..." + "ooo" + ".."
 
 bear_base = [
     ".." + "ooo" + "." * 6 + "ooo" + "..",               # r0 round ears
@@ -139,8 +174,10 @@ bear_base = [
 
 F["bear"] = {
     "idle": [bear_base + [BEAR_FEET_A, E], shift_down(bear_base + [BEAR_FEET_A, E])],
-    "walk": [bear_base + [BEAR_FEET_A, E], bear_base + [BEAR_FEET_B, E]],
+    "walk": walk_cycle(bear_base, bear_base, BEAR_FEET_L, BEAR_FEET_B, BEAR_FEET_R),
     "sleep": sleep_frames("oo", "oo"),
+    "yawn": yawn_frames(bear_base, BEAR_FEET_A),
+    "stretch": stretch_frames(bear_base, BEAR_FEET_A, BEAR_FEET_B),
 }
 
 # ---------------------------------------------------------------- RABBIT 团子
@@ -162,8 +199,10 @@ rabbit_b = put(rabbit_base, [(13, 13)], "c")
 
 F["rabbit"] = {
     "idle": [rabbit_a + [FEET_A, E], shift_down(rabbit_b + [FEET_A, E])],
-    "walk": [rabbit_a + [FEET_A, E], rabbit_b + [FEET_B, E]],
+    "walk": walk_cycle(rabbit_a, rabbit_b, FEET_L, FEET_B, FEET_R),
     "sleep": sleep_frames("o.", ".o"),
+    "yawn": yawn_frames(rabbit_a, FEET_A),
+    "stretch": stretch_frames(rabbit_a, FEET_A, FEET_B),
 }
 
 # ---------------------------------------------------------------- FOX 小狐
@@ -187,14 +226,18 @@ fox_b = put(fox_b, [(14, 10)], "c")
 
 F["fox"] = {
     "idle": [fox_a + [FEET_A, E], shift_down(fox_b + [FEET_A, E])],
-    "walk": [fox_a + [FEET_A, E], fox_b + [FEET_B, E]],
+    "walk": walk_cycle(fox_a, fox_b, FEET_L, FEET_B, FEET_R),
     "sleep": sleep_frames("oo", ".o", nose=(12, 11)),
+    "yawn": yawn_frames(fox_a, FEET_A),
+    "stretch": stretch_frames(fox_a, FEET_A, FEET_B),
 }
 
 # ---------------------------------------------------------------- PENGUIN QQ
 PEN_BELLY  = "o" + "c" * 10 + "o"            # cols2-13 white belly
 PEN_FEET_A = "...." + "pp" + "...." + "pp" + "...."   # orange feet
 PEN_FEET_B = "....." + "pp" + ".." + "pp" + "....."
+PEN_FEET_L = "..." + "pp" + "...." + "pp" + "....."
+PEN_FEET_R = "....." + "pp" + "...." + "pp" + "..."
 
 penguin_base = [
     "...." + "oooooooo" + "....",                        # r0 rounded head top
@@ -214,10 +257,20 @@ penguin_base = [
 penguin_a = put(penguin_base, [(1, 6), (1, 7), (14, 6), (14, 7)], "o")   # flippers down
 penguin_b = put(penguin_base, [(1, 5), (1, 6), (14, 5), (14, 6)], "o")   # flippers up
 
+
+# yawn: beak opens (dark mouth + lower beak drops onto the belly row)
+penguin_yawn_small = put(penguin_a, [(7, 5), (8, 5)], "p")
+penguin_yawn_big = put(penguin_yawn_small, [(7, 4), (8, 4)], "k")
+# stretch: flippers reach out, then all the way up beside the head, on tiptoe
+penguin_str_a = put(penguin_base, [(1, 6), (1, 7), (14, 6), (14, 7), (0, 6), (15, 6)], "o")
+penguin_str_b = put(penguin_base, [(1, 4), (1, 5), (14, 4), (14, 5), (1, 3), (14, 3)], "o")
+
 F["penguin"] = {
     "idle": [penguin_a + [PEN_FEET_A, E], shift_down(penguin_a + [PEN_FEET_A, E])],
-    "walk": [penguin_a + [PEN_FEET_A, E], penguin_b + [PEN_FEET_B, E]],
+    "walk": walk_cycle(penguin_a, penguin_b, PEN_FEET_L, PEN_FEET_B, PEN_FEET_R),
     "sleep": sleep_frames("oo", "oo", nose=(12, 11)),
+    "yawn": [penguin_yawn_small + [PEN_FEET_A, E], shift_down(penguin_yawn_big + [PEN_FEET_A, E])],
+    "stretch": [penguin_str_a + [PEN_FEET_A, E], penguin_str_b + [PEN_FEET_B, E]],
 }
 
 # ---------------------------------------------------------------- STAR 小克
@@ -261,10 +314,17 @@ star_sleep = [
     E, E, E, E,                                          # r10-13
 ]
 
+
+# stretch: the sparks reach out, then the tips flare in the highlight colour
+star_str_a = put(star_a, [(1, 1), (14, 1), (1, 9), (14, 9)], "o")
+star_str_b = put(star_str_a, [(0, 1), (15, 1), (0, 9), (15, 9), (7, 11), (8, 11)], "p")
+
 F["star"] = {
     "idle": [star_a + [E, E], shift_down(star_b + [E, E])],
-    "walk": [star_a + [E, E], star_b + [E, E]],
+    "walk": [star_a + [E, E], star_b + [E, E], shift_down(star_a + [E, E]), star_b + [E, E]],
     "sleep": [star_sleep + [E, E], shift_down(star_sleep + [E, E])],
+    "yawn": yawn_frames(star_a, E),
+    "stretch": [star_str_a + [E, E], star_str_b + [E, E]],
 }
 
 # eye pixels for blink/happy overlays (frame 0 coordinates)
@@ -302,7 +362,7 @@ def draw_frame(img, ox, oy, frame, pal, scale):
                              ox + (x+1)*scale - 1, oy + (y+1)*scale - 1], fill=c)
 
 def preview(path, scale=10, pad=12):
-    order = ["idle", "walk", "sleep"]
+    order = ["idle", "walk", "sleep", "yawn", "stretch"]
     cols = sum(len(F["cat"][s]) for s in order)
     iw = cols * (W*scale + pad) + pad
     ih = len(F) * (H*scale + pad) + pad

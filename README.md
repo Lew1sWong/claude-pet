@@ -55,7 +55,33 @@ npm start
 - **Drag** it anywhere; it only walks horizontally
 - **Click** → pet it; **double-click** → take a rest
 - **Tray icon** (menu bar on macOS / system tray on Windows) or **right-click** the pet → switch character, size, auto-start, refresh, quit
-- ◀ ▶ in the panel cycles through all 7 pets
+- ◀ ▶ in the panel cycles through all pets
+- Pets now really **walk** (4-frame gait) and occasionally stop to **yawn** 🥱 or **stretch** — sleepier pets yawn more
+
+### Fable ✦ usage, separately tracked
+
+If your subscription includes **Fable / Mythos-tier** models, the usage panel grows a dedicated violet **F✦ bar**, the tray tooltip shows it, and the pet sends its own notifications when Fable crosses **80% / 95%** (and celebrates when it resets). The priciest window also feeds the pet's mood.
+
+### Track OTHER agents too (Codex / OpenClaw 🦞 / anything)
+
+Claude isn't the only thing burning tokens. In **Settings → Usage sources** you can enable:
+
+| Source | How it works |
+| --- | --- |
+| **Claude** (default) | local Claude Code credentials → official usage numbers |
+| **Codex** | reads OpenAI Codex CLI's local session logs (`~/.codex`) — no login, no network |
+| **OpenClaw 🦞** | finds OpenClaw's Anthropic token and queries its quota (best-effort) |
+| **Custom JSON** | universal adapter: point at a JSON file or URL — any agent can feed the pet |
+
+Custom JSON format (a single object, or an array for several agents at once):
+
+```json
+{ "label": "My Agent", "windows": [ { "label": "day", "pct": 42, "resetsAt": "2026-07-15T02:00:00Z" } ] }
+```
+
+### Pixel buddy — put someone you love on your screen ❤️
+
+**Settings → Pixel buddy**: pick a photo of a family member, friend, partner or your real cat/dog, and Claude Pet pixelates them into a 16×16 companion — with breathing, walking and sleeping animations — so they keep you company while you work. Everything happens locally; the photo never leaves your machine (only the tiny 16×16 pixel grid is stored). Up to 8 buddies, deletable anytime from the character grid.
 
 ### Build standalone installers (optional)
 ```bash
@@ -152,7 +178,33 @@ npm start
 - **拖动**到任意位置；它走路只走水平方向
 - **单击**摸头；**双击**原地休息
 - **托盘图标**（macOS 右上角菜单栏 / Windows 右下角任务栏）或**右键宠物** → 换形象、调大小、开机自启、刷新、退出
-- 面板里 ◀ ▶ 循环切换全部 7 只
+- 面板里 ◀ ▶ 循环切换全部宠物
+- 宠物现在会**真正走路**（4 帧步态），还会时不时停下来**打哈欠** 🥱、**伸懒腰**——越困的宠物哈欠越多
+
+### Fable ✦ 用量单独提醒
+
+如果你的订阅包含 **Fable / Mythos 级**模型，用量面板会多出一条专属的紫色 **F✦ 进度条**，托盘悬浮提示也会显示；Fable 用量冲过 **80% / 95%** 时会单独弹系统通知提醒你（重置时也会庆祝）。这条最贵的额度同样会影响宠物心情。
+
+### 也能追踪其他 Agent 的用量（Codex / OpenClaw 龙虾 🦞 / 任意工具）
+
+烧 token 的不只有 Claude。在 **设置 → 用量数据源** 里可以开启：
+
+| 数据源 | 原理 |
+| --- | --- |
+| **Claude**（默认） | 本机 Claude Code 凭证 → 官方用量数据 |
+| **Codex** | 本地读取 OpenAI Codex CLI 的会话日志（`~/.codex`），不用登录、不发网络请求 |
+| **OpenClaw 龙虾 🦞** | 找到 OpenClaw 存的 Anthropic 凭证去查它的额度（尽力而为） |
+| **自定义 JSON** | 万能适配器：指向一个 JSON 文件或 URL，任何 agent 都能接入 |
+
+自定义 JSON 格式（单个对象，或用数组一次接入多个 agent）：
+
+```json
+{ "label": "My Agent", "windows": [ { "label": "day", "pct": 42, "resetsAt": "2026-07-15T02:00:00Z" } ] }
+```
+
+### 像素伙伴 —— 把爱的人放到屏幕上 ❤️
+
+**设置 → 像素伙伴**：选一张家人、朋友、恋人或自家猫狗的照片，Claude Pet 会把 TA 像素化成 16×16 的小人 —— 会呼吸、会走路、会躺下睡觉，工作时一直陪着你。全程本地处理，照片不会离开你的电脑（只保存那张小小的 16×16 像素网格）。最多 8 个伙伴，随时可以在形象网格里删除。
 
 ### 打包成独立安装包（可选）
 ```bash
