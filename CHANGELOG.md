@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.3.0 — 2026-10-23 · "菜园与天气预报"
+
+### 🌱 Pixel garden (desktop)
+- Three plots under the usage bars (and in the Dynamic Island's lower area).
+  Click an empty plot to plant (carrot 🥕 → tomato 🍅 → sunflower 🌻 in
+  turn), ripe crops glow — click to harvest and the pet eats it on the spot.
+- Growth pace follows the pet's mood: happy 1×, calm 0.8×, sleepy 0.45×,
+  anxious / overage 0.15×, depleted 0× (the plant gets thirsty 💧 and wilts;
+  it recovers when you ration again). Every quota reset waters the garden.
+- Carrots take ~5 h at full pace, tomatoes ~9 h, sunflowers ~14 h; growth
+  continues between polls and while the app is closed (catch-up capped at
+  6 h). State lives in `settings.json`; toggle in Settings → Features.
+- New achievement 🌱 "Harvest Master" (10 harvests).
+
+### 📈 Trend sparklines + quota weather (desktop)
+- Every fresh poll is recorded (7 days of history). The HUD shows two
+  8-bit sparklines: the 5h window over the last 6 hours and the weekly
+  window over 7 days (resets show as sawtooth drops).
+- A burn-rate forecast (least-squares over the recent samples, reset-aware)
+  projects when the window would hit 100 % and compares it with the reset:
+  ☀️ fine · 🌤 tight · 🌧 runs dry before the reset · ⛈ in the first half of
+  the remaining time. The pet quips about the pace when it turns bad.
+
+### Housekeeping
+- Floating window 260 → 380 px and island host 420 → 500 px (saved
+  positions compensated); `CLAUDE_PET_SMOKE_SHOT=<png>` captures the HUD.
+
 ## 0.2.0 — 2026-10-22 · "跟上 Claude 的新额度体系"
 
 Verified against Claude Code 2.1.280 and a live capture of the usage endpoint

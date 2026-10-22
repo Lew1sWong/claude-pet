@@ -262,6 +262,35 @@ function legacyScoped(w, label) {
   return { key: slug(label), label, sharePct: null, usedOfWeeklyPct: null, ...w };
 }
 
+// usage → mood for the main process (garden pace, tray). Mirrors
+// renderer/petcore.js computeMode(usage, null) — test/mood.test.js keeps the
+// two identical.
+function computeMood(u) {
+  if (!u) return "unknown";
+  const scoped = Array.isArray(u.scoped) ? u.scoped.filter(Boolean) : (u.fable ? [u.fable] : []);
+  if (!u.fiveHour && !u.week && !scoped.length) {
+    const winds = [];
+    (u.others || []).forEach((p) => (p.windows || []).forEach((x) => {
+      if (x && typeof x.pct === "number") winds.push(x.pct);
+    }));
+    if (!winds.length) return "unknown";
+    const worst = Math.max.apply(null, winds);
+    if (worst >= 99.5) return "depleted";
+    if (worst >= 90) return "anxious";
+    if (worst >= 70) return "sleepy";
+    if (worst >= 40) return "calm";
+    return "happy";
+  }
+  if (planExhausted(u)) return isOverage(u) ? "overage" : "depleted";
+  const f = u.fiveHour ? u.fiveHour.pct : 0;
+  const w = u.week ? u.week.pct : 0;
+  const worst = Math.max(f, w, ...scoped.map((s) => (typeof s.pct === "number" ? s.pct : 0)));
+  if (worst >= 90) return "anxious";
+  if (worst >= 70) return "sleepy";
+  if (worst >= 40) return "calm";
+  return "happy";
+}
+
 // the subset of a normalized payload worth caching / sending to renderers;
 // also upgrades pre-0.2.0 cached shapes (bare `fable`, no `scoped`)
 function pickClaude(u) {
@@ -306,4 +335,4 @@ async function fetchUsage(accessToken) {
   return normalize(await res.json());
 }
 
-module.exports = { fetchUsage, normalize, pickClaude, planExhausted, extraActive, isOverage };
+module.exports = { fetchUsage, normalize, pickClaude, planExhausted, extraActive, isOverage, computeMood };

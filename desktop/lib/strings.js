@@ -43,6 +43,35 @@ const zh = {
   "hud.share": "占周额度的 {pct}%",
   "hud.breakdown": "本周去向",
 
+  // 📈 趋势与预测（额度天气）
+  "trend.title": "趋势",
+  "trend.idle": "📈 数据还不够，再观察一会儿",
+  "trend.sunny.f": "☀️ 这个速度，5h 额度稳稳撑到重置",
+  "trend.cloudy.f": "🌤 5h 额度刚好够到重置，悠着点",
+  "trend.rain.f": "🌧 照这速度 {eta} 后 5h 额度就用完，比重置还早",
+  "trend.storm.f": "⛈ 烧得太快！5h 额度 {eta} 后见底",
+  "trend.sunny.w": "☀️ 这个速度，周额度稳稳撑到重置",
+  "trend.cloudy.w": "🌤 周额度刚好够到重置，悠着点",
+  "trend.rain.w": "🌧 照这速度 {eta} 后周额度就用完，比重置还早",
+  "trend.storm.w": "⛈ 烧得太快！周额度 {eta} 后见底",
+  "trend.rate": "{rate}%/小时",
+
+  // 🌱 像素菜园
+  "garden.title": "像素菜园",
+  "garden.plant": "空地 · 点击播种",
+  "garden.ripe": "{crop} 成熟了！点击收获",
+  "garden.growing": "{crop} 生长中 · {pct}%",
+  "garden.thirsty": "{crop} 好渴… 额度省着用它才会长",
+  "garden.harvest": "🎉 收获了{crop}！喂给宠物啦",
+  "garden.hint": "额度省着用菜就长得快，重置会浇水",
+  "crop.carrot": "胡萝卜",
+  "crop.tomato": "番茄",
+  "crop.sunflower": "向日葵",
+  "set.featGarden": "像素菜园",
+  "set.featGardenSub": "三块小地：额度省着用菜就长得快，成熟收获喂宠物",
+  "ach.harvest.title": "丰收达人",
+  "ach.harvest.desc": "收获 10 次作物",
+
   // extra usage（额外用量 / 用量积分）提醒
   "extra.on": "💸 计划额度用完了，已开始消耗额外用量",
   "extra.warn80": "💸 额外用量已到月上限的 {pct}%，留意账单哦",
@@ -194,6 +223,33 @@ const en = {
   "hud.share": "{pct}% of the weekly allowance",
   "hud.breakdown": "This week",
 
+  "trend.title": "Trend",
+  "trend.idle": "📈 Not enough data yet — give it a little while",
+  "trend.sunny.f": "☀️ At this pace the 5h window lasts until the reset",
+  "trend.cloudy.f": "🌤 The 5h window just about makes the reset — easy now",
+  "trend.rain.f": "🌧 At this pace the 5h window runs dry in {eta}, before the reset",
+  "trend.storm.f": "⛈ Burning fast — the 5h window is dry in {eta}",
+  "trend.sunny.w": "☀️ At this pace the weekly window lasts until the reset",
+  "trend.cloudy.w": "🌤 The weekly window just about makes the reset — easy now",
+  "trend.rain.w": "🌧 At this pace the weekly window runs dry in {eta}, before the reset",
+  "trend.storm.w": "⛈ Burning fast — the weekly window is dry in {eta}",
+  "trend.rate": "{rate}%/h",
+
+  "garden.title": "Pixel garden",
+  "garden.plant": "Empty plot · click to plant",
+  "garden.ripe": "{crop} is ripe! Click to harvest",
+  "garden.growing": "{crop} growing · {pct}%",
+  "garden.thirsty": "{crop} is thirsty… it only grows while you ration your quota",
+  "garden.harvest": "🎉 Harvested a {crop} — fed to the pet!",
+  "garden.hint": "Grows faster when you ration your quota; resets water it",
+  "crop.carrot": "carrot",
+  "crop.tomato": "tomato",
+  "crop.sunflower": "sunflower",
+  "set.featGarden": "Pixel garden",
+  "set.featGardenSub": "Three plots: they grow faster when you ration your quota; harvest to feed the pet",
+  "ach.harvest.title": "Harvest Master",
+  "ach.harvest.desc": "Harvest 10 crops",
+
   "extra.on": "💸 Plan limits hit — now using usage credits",
   "extra.warn80": "💸 Usage credits at {pct}% of the monthly spend limit — mind the bill",
   "extra.warn95": "‼️ Usage credits at {pct}% — about to hit the spend limit!",
@@ -334,6 +390,11 @@ const lines = {
       click: ["陪你工作~", "加油加油!", "想我了吗?", "❤"],
       feed: ["谢谢~ 你也要好好吃饭!", "啊呜~ 一起补充能量!"],
     },
+    weather: {
+      rain: ["🌧 照这速度撑不到重置哦…", "省着点, 等会儿还要用呢"],
+      storm: ["⛈ 慢点慢点! 这速度今晚要饿肚子", "额度在狂泻… 💦"],
+    },
+    harvest: ["啊呜~ 自己种的最香!", "咔嚓咔嚓~ 新鲜!", "谢谢你照顾菜园 ❤"],
   },
   en: {
     click: {
@@ -369,6 +430,11 @@ const lines = {
       click: ["here with you~", "you got this!", "miss me?", "❤"],
       feed: ["thanks~ eat well too!", "nom~ recharging together!"],
     },
+    weather: {
+      rain: ["🌧 won't make it to the reset at this pace…", "go easy, you'll need some later"],
+      storm: ["⛈ slow down! we'll starve tonight", "the quota's pouring out… 💦"],
+    },
+    harvest: ["nom~ home-grown is the best!", "crunch crunch~ so fresh!", "thanks for tending the garden ❤"],
   },
 };
 

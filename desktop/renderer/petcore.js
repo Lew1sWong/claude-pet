@@ -302,10 +302,153 @@
     });
   }
 
+  // ---- 📈 trend: pixel sparklines + "quota weather" ----
+  // "1h 20m" / "1 小时 20 分" for forecast ETAs
+  function fmtEta(ms) {
+    if (typeof ms !== "number" || !isFinite(ms) || ms < 0) return "";
+    const en = typeof window !== "undefined" && window.__lang === "en";
+    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+    if (h >= 48) return en ? `${Math.floor(h / 24)}d ${h % 24}h` : `${Math.floor(h / 24)} 天 ${h % 24} 小时`;
+    if (h > 0) return en ? `${h}h ${String(m).padStart(2, "0")}m` : `${h} 小时 ${String(m).padStart(2, "0")} 分`;
+    return en ? `${Math.max(1, m)}m` : `${Math.max(1, m)} 分钟`;
+  }
+  // step-style pixel line of [[t, pct], …] over [from, to]; 70/90 guide ticks
+  function drawSparkline(canvas, series, from, to) {
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(255,255,255,.07)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(255,255,255,.14)";
+    for (const g of [70, 90]) { const y = Math.round(H - 1 - (g / 100) * (H - 1)); for (let x = 0; x < W; x += 3) ctx.fillRect(x, y, 1, 1); }
+    if (!Array.isArray(series) || series.length < 2 || to <= from) return;
+    let px = null, py = null;
+    for (const [t, pct] of series) {
+      if (t < from || t > to) continue;
+      const x = Math.round(((t - from) / (to - from)) * (W - 1));
+      const y = Math.round(H - 1 - (Math.max(0, Math.min(100, pct)) / 100) * (H - 1));
+      ctx.fillStyle = pct >= 90 ? "#ff6b5e" : pct >= 70 ? "#e6c455" : "#6cc887";
+      if (px !== null) {
+        // horizontal run, then a vertical step — reads like an 8-bit chart
+        for (let xx = px; xx <= x; xx++) ctx.fillRect(xx, py, 1, 1);
+        const lo = Math.min(py, y), hi = Math.max(py, y);
+        for (let yy = lo; yy <= hi; yy++) ctx.fillRect(x, yy, 1, 1);
+      }
+      ctx.fillRect(x, y, 1, 1);
+      px = x; py = y;
+    }
+  }
+  function renderTrend(container, usage) {
+    if (!container) return;
+    const tr = usage && usage.trend;
+    const show = !!(tr && ((tr.seriesF && tr.seriesF.length > 1) || (tr.seriesW && tr.seriesW.length > 1)));
+    container.classList.toggle("hidden", !show);
+    if (!show) return;
+    if (!container._parts) {
+      container.textContent = "";
+      const mk = (labelText) => {
+        const row = document.createElement("div");
+        row.className = "spark-row";
+        const label = document.createElement("span");
+        label.className = "bar-label";
+        label.textContent = labelText;
+        const canvas = document.createElement("canvas");
+        canvas.width = 150; canvas.height = 14;
+        canvas.className = "spark";
+        row.appendChild(label); row.appendChild(canvas);
+        container.appendChild(row);
+        return { row, label, canvas };
+      };
+      const f = mk("5H"), w = mk("");
+      const line = document.createElement("div");
+      line.className = "trend-line";
+      container.appendChild(line);
+      container._parts = { f, w, line };
+    }
+    const P = container._parts;
+    const now = Date.now();
+    P.w.label.textContent = tt("hud.week");
+    drawSparkline(P.f.canvas, tr.seriesF, now - 6 * 3600e3, now);
+    drawSparkline(P.w.canvas, tr.seriesW, now - 7 * 24 * 3600e3, now);
+    P.f.canvas.title = "5h · 6h"; P.w.canvas.title = tt("hud.week") + " · 7d";
+    const key = tr.worst === "w" ? "w" : "f";
+    const o = key === "w" ? tr.week : tr.five;
+    let text = tt("trend.idle");
+    if (o && o.weather && o.weather !== "unknown") {
+      text = tt(`trend.${o.weather}.${key}`).replace("{eta}", fmtEta(o.etaMs));
+      if (typeof o.rate === "number" && o.rate > 0) text += " · " + tt("trend.rate").replace("{rate}", o.rate.toFixed(1));
+    }
+    P.line.textContent = text;
+  }
+
+  // ---- 🌱 pixel garden ----
+  function paintFrame(ctx, frame, pal) {
+    ctx.clearRect(0, 0, 16, 16);
+    for (let y = 0; y < 16; y++) {
+      const row = frame[y];
+      for (let x = 0; x < 16; x++) {
+        const c = row[x];
+        if (c !== ".") { ctx.fillStyle = pal[c]; ctx.fillRect(x, y, 1, 1); }
+      }
+    }
+  }
+  function stageOfPlot(p) {
+    if (!p) return -1;
+    if (p.progress >= 1) return 3;
+    return Math.min(2, Math.floor(p.progress * 3));
+  }
+  // garden: {plots: [{crop, progress, wilt}|null ×3], harvested}; onPlot(i, plot) on click
+  function renderGarden(container, garden, onPlot) {
+    if (!container) return;
+    const G = typeof window !== "undefined" && window.GARDEN_SPRITES;
+    const show = !!(garden && Array.isArray(garden.plots) && G);
+    container.classList.toggle("hidden", !show);
+    if (!show) return;
+    if (!container._plots) {
+      container.textContent = "";
+      const row = document.createElement("div");
+      row.className = "garden-row";
+      container._plots = garden.plots.map((_, i) => {
+        const c = document.createElement("canvas");
+        c.width = 16; c.height = 16;
+        c.className = "plot";
+        c.addEventListener("click", (e) => { e.stopPropagation(); if (onPlot) onPlot(i, container._garden ? container._garden.plots[i] : null); });
+        row.appendChild(c);
+        return c;
+      });
+      container.appendChild(row);
+      const hint = document.createElement("div");
+      hint.className = "garden-hint";
+      container.appendChild(hint);
+      container._hint = hint;
+    }
+    container._garden = garden;
+    garden.plots.forEach((p, i) => {
+      const c = container._plots[i];
+      if (!c) return;
+      const ctx = c.getContext("2d");
+      const st = stageOfPlot(p);
+      const frame = p && G.crops[p.crop] ? G.crops[p.crop][st] : G.soil;
+      paintFrame(ctx, frame, G.palette);
+      const thirsty = !!(p && p.wilt >= 0.5 && st < 3);
+      if (thirsty) { ctx.fillStyle = "#5aa7ff"; ctx.fillRect(13, 1, 2, 2); ctx.fillRect(14, 0, 1, 1); }
+      c.classList.toggle("ripe", st === 3);
+      c.classList.toggle("thirsty", thirsty);
+      c.classList.toggle("empty", !p);
+      const crop = p ? tt("crop." + p.crop) : "";
+      c.title = !p ? tt("garden.plant")
+        : st === 3 ? tt("garden.ripe").replace("{crop}", crop)
+          : thirsty ? tt("garden.thirsty").replace("{crop}", crop)
+            : tt("garden.growing").replace("{crop}", crop).replace("{pct}", String(Math.round(p.progress * 100)));
+    });
+    container._hint.textContent = tt("garden.hint") + (garden.harvested ? ` · 🧺 ${garden.harvested}` : "");
+  }
+
   window.PetCore = {
     computeMode, planExhausted, extraActive, isOverage, blockingWindow, lockedReason, scopedList,
-    fmtCd, fmtMoney, extraSummary,
+    fmtCd, fmtMoney, fmtEta, extraSummary,
     drawPet, frameCount, mergeCustomPets,
     renderOthers, renderScoped, renderExtra, renderBreakdown,
+    drawSparkline, renderTrend, renderGarden, stageOfPlot,
   };
 })();
