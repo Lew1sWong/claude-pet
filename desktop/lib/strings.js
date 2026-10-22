@@ -29,6 +29,24 @@ const zh = {
   "msg.depleted": "额度用完啦 💤",
   "bubble.zzz": "Zzz…",
   "celebrate.reset": "🎉 5 小时额度已重置，宠物精神满满！",
+  "celebrate.weekReset": "🎉 每周额度已重置，元气满满的新一周！",
+  "msg.overage": "计划额度已用完，正在消耗额外用量 💸",
+  "msg.locked": "🔒 额度已锁定：{reason}",
+  "pet.pause": "⏸ 原地休息~",
+  "pet.resume": "▶ 继续散步!",
+  "err.rateIn": "被限流了，约 {min} 分钟后自动重试",
+
+  // 0.2.0 hud rows: scoped limits (Fable ✦ …) / extra usage / weekly breakdown
+  "hud.extra": "额外用量（用量积分）",
+  "hud.extraUsed": "已用 {used}",
+  "hud.extraCapped": "额外用量也到上限了",
+  "hud.share": "占周额度的 {pct}%",
+  "hud.breakdown": "本周去向",
+
+  // extra usage（额外用量 / 用量积分）提醒
+  "extra.on": "💸 计划额度用完了，已开始消耗额外用量",
+  "extra.warn80": "💸 额外用量已到月上限的 {pct}%，留意账单哦",
+  "extra.warn95": "‼️ 额外用量已到 {pct}%，马上触顶！",
 
   // Fable（Mythos 级模型）单独提醒
   "fable.warn80": "✦ Fable 用量已到 {pct}% — 顶级模型烧得快，注意分配哦",
@@ -77,7 +95,7 @@ const zh = {
   // usage data sources
   "set.sources": "用量数据源",
   "set.srcClaude": "Claude",
-  "set.srcClaudeSub": "Claude Code / claude.ai 订阅额度（含 Fable ✦ 单独提醒）",
+  "set.srcClaudeSub": "Claude Code / claude.ai 订阅额度：5h · 周 · 模型专属额度（Fable ✦）· 额外用量",
   "set.srcCodex": "Codex",
   "set.srcCodexSub": "OpenAI Codex CLI — 本地读取，无需登录",
   "set.srcOpenclaw": "OpenClaw 龙虾 🦞",
@@ -163,6 +181,22 @@ const en = {
   "msg.depleted": "Out of quota 💤",
   "bubble.zzz": "Zzz…",
   "celebrate.reset": "🎉 5-hour quota reset — the pet's recharged!",
+  "celebrate.weekReset": "🎉 Weekly quota reset — fresh week, fresh tokens!",
+  "msg.overage": "Plan limits hit — now using usage credits 💸",
+  "msg.locked": "🔒 Limit locked: {reason}",
+  "pet.pause": "⏸ taking a break~",
+  "pet.resume": "▶ back to strolling!",
+  "err.rateIn": "Rate-limited — retrying in ~{min} min",
+
+  "hud.extra": "Usage credits (extra usage)",
+  "hud.extraUsed": "used {used}",
+  "hud.extraCapped": "usage credits are capped too",
+  "hud.share": "{pct}% of the weekly allowance",
+  "hud.breakdown": "This week",
+
+  "extra.on": "💸 Plan limits hit — now using usage credits",
+  "extra.warn80": "💸 Usage credits at {pct}% of the monthly spend limit — mind the bill",
+  "extra.warn95": "‼️ Usage credits at {pct}% — about to hit the spend limit!",
 
   "fable.warn80": "✦ Fable usage hit {pct}% — the Mythos tier burns fast, pace yourself",
   "fable.warn95": "‼️ Fable usage at {pct}% — almost dry!",
@@ -207,7 +241,7 @@ const en = {
 
   "set.sources": "Usage sources",
   "set.srcClaude": "Claude",
-  "set.srcClaudeSub": "Claude Code / claude.ai subscription quota (with a dedicated Fable ✦ reminder)",
+  "set.srcClaudeSub": "Claude Code / claude.ai subscription: 5h · weekly · model-scoped (Fable ✦) · usage credits",
   "set.srcCodex": "Codex",
   "set.srcCodexSub": "OpenAI Codex CLI — read locally, no login needed",
   "set.srcOpenclaw": "OpenClaw 🦞",
@@ -290,6 +324,7 @@ const lines = {
       calm: ["悠哉悠哉…", "代码和我, 你先看谁?", "嗯哼~ ♪", "伸个懒腰…"],
       sleepy: ["有点困了…", "额度有点紧张了哦", "省着点问 Claude 呀…"],
       anxious: ["额度快没啦!!", "💦 要不要歇一会?", "快到极限了…"],
+      overage: ["在烧额外用量啦 💸", "钱包在冒烟…悠着点", "按量计费中, 省着点问"],
     },
     combo: "别 rua 了别 rua 了!!",
     beg: "求求你🥺给点纯血 token 吧～",
@@ -324,6 +359,7 @@ const lines = {
       calm: ["taking it easy…", "me or the code first?", "hmm~ ♪", "stretch…"],
       sleepy: ["a bit sleepy…", "quota's getting tight", "ask Claude sparingly…"],
       anxious: ["quota almost gone!!", "💦 take a break?", "nearly at the limit…"],
+      overage: ["burning extra usage 💸", "the wallet's smoking… easy", "pay-as-you-go now, go easy"],
     },
     combo: "stop poking meee!!",
     beg: "pls🥺 spare some pure-blood tokens~",

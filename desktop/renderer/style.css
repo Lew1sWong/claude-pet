@@ -144,3 +144,25 @@ html, body {
   from { opacity: 1; transform: translateY(0); }
   to   { opacity: 0; transform: translateY(-34px); }
 }
+
+/* ---------------- 0.2.0: scoped limits / extra usage / breakdown ---------------- */
+/* other model-scoped weekly windows (Opus ✦ / Sonnet ✦ …) — teal */
+.bar-label.scoped { color: #8fc7d8; }
+.bar-fill.scoped { background-color: #5aa7bd; }
+.bar-fill.scoped.warn { background-color: #e6b455; }
+.bar-fill.scoped.danger { background-color: #d9634f; }
+/* extra usage (usage credits past the plan limits) — gold */
+.bar-label.extra { color: #e0c070; }
+.bar-fill.extra { background-color: #c9a227; }
+.bar-fill.extra.warn { background-color: #e6b455; }
+.bar-fill.extra.danger { background-color: #d9634f; }
+/* "本周去向: Claude Code 79% · Cowork 19%" */
+.breakdown {
+  margin-top: 5px;
+  color: #9a9ab0;
+  font-size: 10px;
+  line-height: 1.35;
+}
+/* the HUD can now outgrow the window (many sources) — scroll instead of clipping */
+#hud { max-height: calc(100% - 8px); overflow-y: auto; scrollbar-width: none; }
+#hud::-webkit-scrollbar { display: none; }

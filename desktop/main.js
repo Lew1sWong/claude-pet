@@ -6,7 +6,7 @@ const {
 const path = require("path");
 const fs = require("fs");
 const { readCredentials } = require("./lib/credentials");
-const { fetchUsage } = require("./lib/usageClient");
+const { fetchUsage, normalize, pickClaude, isOverage } = require("./lib/usageClient");
 const { collectOthers } = require("./lib/providers");
 const { createBossController, DEFAULT_DISGUISES } = require("./lib/bossKey");
 const { readNotch } = require("./lib/notch");
@@ -20,11 +20,12 @@ const PROFESSIONS = [
 ];
 
 const WIN_W = 230;
-const WIN_H = 215;
+const WIN_H = 260;            // taller HUD: scoped limits / extra usage / breakdown rows
+const LEGACY_WIN_H = 215;     // height before 0.2.0 — keeps a saved y stable across the bump
 // Dynamic Island window — bigger than the pill itself so the expanded panel
 // and drop-shadow have room; the actual capsule is sized/animated in CSS.
 const ISLAND_W = 420;
-const ISLAND_H = 360;
+const ISLAND_H = 420;
 // single source of truth for the character menus (tray + right-click on pet)
 const CHARACTERS = [
   ["cat", "🐱 小橘"],
@@ -47,7 +48,11 @@ let dragTimer = null;
 let pollTimer = null;
 let prevFiveHourPct = null;
 let prevFablePct = null;     // Fable gets its own threshold reminders
+let prevWeekPct = null;      // weekly reset celebration
+let prevExtraPct = null;     // extra-usage (credits) threshold reminders
+let prevOverage = null;      // plan limits hit while credits carry the load
 const FABLE_THRESHOLDS = [80, 95];
+const EXTRA_THRESHOLDS = [80, 95];
 let settings = {};
 let cooldownUntil = 0;       // persisted across restarts
 let lastRequestAt = 0;       // wall-clock of last actual network hit
@@ -70,9 +75,14 @@ function loadSettings() {
   cooldownUntil = Number(settings.cooldownUntil) || 0;
   backoffLevel = Number(settings.backoffLevel) || 0;
   if (settings.lastUsage && settings.lastUsageAt) {
-    lastUsage = settings.lastUsage;
+    // pre-0.2.0 caches carry `raw` and a bare `fable` (no label/key, no
+    // `scoped`) — normalise once so every consumer sees the 0.2.0 contract
+    lastUsage = { ...pickClaude(settings.lastUsage), others: settings.lastUsage.others || [] };
     prevFiveHourPct = lastUsage.fiveHour ? lastUsage.fiveHour.pct : null;
     prevFablePct = lastUsage.fable ? lastUsage.fable.pct : null;
+    prevWeekPct = lastUsage.week ? lastUsage.week.pct : null;
+    prevExtraPct = lastUsage.extra && typeof lastUsage.extra.pct === "number" ? lastUsage.extra.pct : null;
+    prevOverage = isOverage(lastUsage);
   }
 }
 function saveSettings() {
@@ -180,7 +190,7 @@ function bumpStat(kind) {
   if (before < ACH_GOAL && st[k] >= ACH_GOAL) {
     // newly unlocked → toast + the pet celebrates
     const title = tr(kind === "boss" ? "ach.boss.title" : "ach.game.title");
-    try { new Notification({ title: tr("app.name"), body: tr("ach.toast") + title }).show(); } catch { /* ignore */ }
+    notify(tr("ach.toast") + title);
     sendToWin("celebrate");
   }
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send("stats", statsNow());
@@ -205,12 +215,16 @@ function createWindow() {
     const cx = b.x + (islandNotch.notchCenter || b.width / 2);
     geom = { width: ISLAND_W, height: ISLAND_H, x: Math.round(cx - ISLAND_W / 2), y: b.y };
   } else {
-    geom = {
-      width: WIN_W,
-      height: WIN_H,
-      x: Number.isFinite(settings.x) ? settings.x : wa.x + 120,
-      y: Number.isFinite(settings.y) ? settings.y : wa.y + wa.height - WIN_H,
-    };
+    // the window grew in 0.2.0; shift a saved y so the pet's feet stay put,
+    // clamping against the display the pet was parked on (not the primary —
+    // external monitors can sit above/below it with their own y-range)
+    const savedH = Number.isFinite(settings.winH) ? settings.winH : LEGACY_WIN_H;
+    const x = Number.isFinite(settings.x) ? settings.x : wa.x + 120;
+    let y = Number.isFinite(settings.y) ? settings.y + (savedH - WIN_H) : wa.y + wa.height - WIN_H;
+    const own = screen.getDisplayMatching({ x, y, width: WIN_W, height: WIN_H }).workArea;
+    y = Math.max(own.y, Math.min(y, own.y + own.height - WIN_H));
+    geom = { width: WIN_W, height: WIN_H, x, y };
+    if (Number.isFinite(settings.y)) { settings.y = y; settings.winH = WIN_H; }
   }
   win = new BrowserWindow({
     ...geom,
@@ -266,10 +280,27 @@ function createWindow() {
     } else if (Date.now() < cooldownUntil) {
       sendToWin("usage-error", {
         code: "rate-limit",
-        message: `被限流恢复中，约 ${Math.ceil((cooldownUntil - Date.now()) / 60000)} 分钟后自动重试`,
+        message: tr("err.rateIn").replace("{min}", String(Math.max(1, Math.ceil((cooldownUntil - Date.now()) / 60000)))),
       });
     }
-    scheduleNextPoll();
+    // fetch right away when the cache is older than one poll interval (poll()
+    // still honours the rate-limit cooldown and the MIN_REFRESH floor);
+    // otherwise just arm the regular timer
+    const stale = !settings.lastUsageAt || Date.now() - settings.lastUsageAt > POLL_SECONDS * 1000;
+    if (stale && featureFlags().usage) poll();
+    else scheduleNextPoll();
+    // CLAUDE_PET_SMOKE=1: after the first poll, print what the HUD rendered
+    // and the normalized usage, so a headless boot can prove the renderer works
+    if (process.env.CLAUDE_PET_SMOKE) {
+      setTimeout(async () => {
+        try {
+          const txt = await win.webContents.executeJavaScript(
+            "(function(){const h=document.getElementById('hud')||document.querySelector('.body');return h?h.textContent.replace(/\\s+/g,' ').trim():'(no hud)';})()");
+          console.log("SMOKE HUD:", JSON.stringify(txt));
+          console.log("SMOKE usage:", JSON.stringify(lastUsage ? pickClaude(lastUsage) : null));
+        } catch (e) { console.log("SMOKE error:", String((e && e.message) || e)); }
+      }, 15000);
+    }
   });
 }
 
@@ -309,13 +340,31 @@ function publicSettings() {
   };
 }
 
+// macOS: dock.hide() within ~1 s of dock.show() is a documented no-op
+// (Electron ≥45 dock.md), so a quick open/close of Settings would leave the
+// accessory app stuck in the Dock — defer the hide past that window
+let dockShownAt = 0;
+function dockShow() {
+  if (process.platform !== "darwin" || !app.dock) return;
+  app.dock.show();
+  dockShownAt = Date.now();
+}
+function dockHide() {
+  if (process.platform !== "darwin" || !app.dock) return;
+  const wait = Math.max(0, 1100 - (Date.now() - dockShownAt));
+  setTimeout(() => {
+    if (isQuitting) return;
+    if (!settingsWin || settingsWin.isDestroyed()) app.dock.hide();
+  }, wait);
+}
+
 function openSettings(opts) {
   const onboarding = !!(opts && opts.onboarding);
   // mark onboarded immediately so it only ever auto-pops once
   if (onboarding && !settings.onboarded) { settings.onboarded = true; saveSettings(); }
   // this is a dock-hidden accessory app; show the dock so the settings window
   // can come to the front and take focus over whatever app is active
-  if (process.platform === "darwin" && app.dock) app.dock.show();
+  dockShow();
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); app.focus({ steal: true }); return; }
   settingsWin = new BrowserWindow({
     width: 480, height: 640,
@@ -337,7 +386,7 @@ function openSettings(opts) {
   });
   settingsWin.on("closed", () => {
     settingsWin = null;
-    if (process.platform === "darwin" && app.dock) app.dock.hide(); // back to accessory
+    dockHide(); // back to accessory
   });
 }
 
@@ -417,35 +466,65 @@ function scheduleNextPoll() {
   pollTimer = setTimeout(() => poll(), wait);
 }
 
-// reset celebration + Fable's dedicated threshold reminders (80% / 95%);
-// runs only on a FRESH Claude fetch so cached re-sends can't re-toast
+function notify(body) {
+  try {
+    const n = new Notification({ title: tr("app.name"), body });
+    // Electron ≥42 uses UNNotification on macOS, which needs a code-signed app;
+    // an unsigned dev build emits "failed" instead of throwing — log, don't die
+    n.on("failed", (_e, err) => console.warn("[notify] notification failed:", err));
+    n.show();
+  } catch { /* ignore */ }
+}
+// highest threshold crossed upward between two readings (or null)
+function crossed(prev, cur, thresholds) {
+  if (prev === null || cur === null) return null;
+  for (const th of thresholds.slice().reverse()) if (prev < th && cur >= th) return th;
+  return null;
+}
+
+// reset celebrations (5h / weekly), Fable's dedicated threshold reminders
+// (80% / 95%) and extra-usage (credits) alerts; runs only on a FRESH Claude
+// fetch so cached re-sends can't re-toast
 function checkClaudeNotifications(usage) {
   const pct = usage.fiveHour ? usage.fiveHour.pct : null;
-  if (
-    prevFiveHourPct !== null && pct !== null &&
-    prevFiveHourPct >= 80 && pct <= prevFiveHourPct - 50
-  ) {
+  if (prevFiveHourPct !== null && pct !== null && prevFiveHourPct >= 80 && pct <= prevFiveHourPct - 50) {
     sendToWin("celebrate");
-    try { new Notification({ title: tr("app.name"), body: tr("celebrate.reset") }).show(); } catch { /* ignore */ }
+    notify(tr("celebrate.reset"));
   }
   if (pct !== null) prevFiveHourPct = pct;
 
+  const wk = usage.week ? usage.week.pct : null;
+  if (prevWeekPct !== null && wk !== null && prevWeekPct >= 50 && wk <= prevWeekPct - 40) {
+    sendToWin("celebrate");
+    notify(tr("celebrate.weekReset"));
+  }
+  if (wk !== null) prevWeekPct = wk;
+
   const f = usage.fable ? usage.fable.pct : null;
   if (f !== null && prevFablePct !== null) {
-    for (const th of FABLE_THRESHOLDS.slice().reverse()) {
-      if (prevFablePct < th && f >= th) {
-        const body = tr(th >= 95 ? "fable.warn95" : "fable.warn80")
-          .replace("{pct}", String(Math.round(f)));
-        try { new Notification({ title: tr("app.name"), body }).show(); } catch { /* ignore */ }
-        break; // one Fable toast per poll (the highest crossed threshold)
-      }
-    }
+    const th = crossed(prevFablePct, f, FABLE_THRESHOLDS); // one Fable toast per poll
+    if (th !== null) notify(tr(th >= 95 ? "fable.warn95" : "fable.warn80").replace("{pct}", String(Math.round(f))));
     if (prevFablePct >= 80 && f <= prevFablePct - 50) {
       sendToWin("celebrate");
-      try { new Notification({ title: tr("app.name"), body: tr("fable.reset") }).show(); } catch { /* ignore */ }
+      notify(tr("fable.reset"));
     }
   }
   if (f !== null) prevFablePct = f;
+
+  // extra usage: one toast when credits start carrying the load, then at
+  // 80% / 95% of the monthly cap
+  const over = isOverage(usage);
+  if (prevOverage === false && over) {
+    const ex = usage.extra;
+    notify(tr("extra.on") + (ex && typeof ex.pct === "number" ? ` (${Math.round(ex.pct)}%)` : ""));
+  }
+  prevOverage = over;
+  const ex = usage.extra && usage.extra.enabled && typeof usage.extra.pct === "number" ? usage.extra.pct : null;
+  if (ex !== null && prevExtraPct !== null) {
+    const th = crossed(prevExtraPct, ex, EXTRA_THRESHOLDS);
+    if (th !== null) notify(tr(th >= 95 ? "extra.warn95" : "extra.warn80").replace("{pct}", String(Math.round(ex))));
+  }
+  prevExtraPct = ex;
 }
 
 // manual=true comes from the refresh button / menu
@@ -460,24 +539,29 @@ async function poll(manual = false) {
   let fresh = null;          // fresh Claude usage from THIS round
   let claudeError = false;   // an error was already reported to the renderer
 
+  // CLAUDE_PET_FIXTURE=/path/to/payload.json — dev/offline mode: replay a
+  // captured usage payload instead of calling the API (no credentials needed)
+  const fixture = process.env.CLAUDE_PET_FIXTURE || "";
   if (flags.claude) {
-    if (now < cooldownUntil) {
+    if (!fixture && now < cooldownUntil) {
       // still cooling down from a rate-limit? don't even try
       const mins = Math.max(1, Math.ceil((cooldownUntil - now) / 60000));
       sendToWin("usage-error", {
         code: "rate-limit",
-        message: `被限流了，约 ${mins} 分钟后自动重试`,
+        message: tr("err.rateIn").replace("{min}", String(mins)),
       });
       claudeError = true;
-    } else if (now - lastRequestAt >= MIN_REFRESH_MS) {
+    } else if (fixture || now - lastRequestAt >= MIN_REFRESH_MS) {
       lastRequestAt = now;
       try {
-        const creds = await readCredentials();
-        if (!creds) {
+        const creds = fixture ? null : await readCredentials();
+        if (!creds && !fixture) {
           sendToWin("usage-error", { code: "no-credentials" });
           claudeError = true;
         } else {
-          fresh = await fetchUsage(creds.accessToken);
+          fresh = fixture
+            ? normalize(JSON.parse(fs.readFileSync(fixture, "utf8")))
+            : await fetchUsage(creds.accessToken);
           // success — clear any backoff
           backoffLevel = 0;
           cooldownUntil = 0;
@@ -493,7 +577,7 @@ async function poll(manual = false) {
           persistRateState();
           sendToWin("usage-error", {
             code: "rate-limit",
-            message: `被限流了，约 ${Math.max(1, Math.ceil(backoff / 60000))} 分钟后自动重试`,
+            message: tr("err.rateIn").replace("{min}", String(Math.max(1, Math.ceil(backoff / 60000)))),
           });
         } else {
           sendToWin("usage-error", {
@@ -509,9 +593,8 @@ async function poll(manual = false) {
   const others = await othersPromise;
 
   if (!claudeError && !isQuitting) {
-    const base = fresh || (flags.claude && lastUsage
-      ? { fiveHour: lastUsage.fiveHour, week: lastUsage.week, weekOpus: lastUsage.weekOpus, fable: lastUsage.fable }
-      : { fiveHour: null, week: null, weekOpus: null, fable: null });
+    // never persist / forward the raw payload — only the renderer contract
+    const base = pickClaude(fresh || (flags.claude && lastUsage ? lastUsage : {}));
     const merged = { ...base, others };
     lastUsage = merged;
     settings.lastUsage = merged;
@@ -527,17 +610,20 @@ async function poll(manual = false) {
 // ---------------------------------------------------------------- tray
 function updateTrayTitle() {
   if (!tray) return;
-  const pctTxt = lastUsage && lastUsage.fiveHour
-    ? `${Math.round(lastUsage.fiveHour.pct)}%` : null;
-  const fableTxt = lastUsage && lastUsage.fable
-    ? `F✦${Math.round(lastUsage.fable.pct)}%` : null;
+  const u = lastUsage;
+  const pctTxt = u && u.fiveHour ? `${Math.round(u.fiveHour.pct)}%` : null;
+  const over = isOverage(u);
   // macOS shows text beside the tray icon; Windows/Linux only have a tooltip
   if (process.platform === "darwin") {
-    tray.setTitle(pctTxt ? ` 🐾${pctTxt}` : " 🐾", { fontType: "monospacedDigit" });
+    tray.setTitle(over ? " 🐾💸" : pctTxt ? ` 🐾${pctTxt}` : " 🐾", { fontType: "monospacedDigit" });
   }
   const parts = ["Claude Pet"];
   if (pctTxt) parts.push(`5h ${pctTxt}`);
-  if (fableTxt) parts.push(fableTxt);
+  if (u && u.week) parts.push(`${tr("hud.week")} ${Math.round(u.week.pct)}%`);
+  for (const s of (u && Array.isArray(u.scoped) ? u.scoped : [])) parts.push(`${s.label || "?"}✦ ${Math.round(s.pct)}%`);
+  if (u && u.extra && u.extra.enabled) {
+    parts.push(`💸 ${typeof u.extra.pct === "number" ? Math.round(u.extra.pct) + "%" : tr("hud.extra")}`);
+  }
   tray.setToolTip(parts.join(" · "));
 }
 
@@ -604,6 +690,7 @@ ipcMain.on("drag-end", () => {
     const [x, y] = win.getPosition();
     settings.x = x;
     settings.y = y;
+    settings.winH = WIN_H;
     saveSettings();
   }
 });

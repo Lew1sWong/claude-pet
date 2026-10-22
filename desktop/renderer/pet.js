@@ -23,10 +23,9 @@
   const pctw = document.getElementById("pctw");
   const reset5 = document.getElementById("reset5");
   const resetw = document.getElementById("resetw");
-  const rowFable = document.getElementById("row-fable");
-  const barf = document.getElementById("barf");
-  const pctf = document.getElementById("pctf");
-  const resetf = document.getElementById("resetf");
+  const scopedEl = document.getElementById("scoped");
+  const extraEl = document.getElementById("extra");
+  const breakdownEl = document.getElementById("breakdown");
   const othersEl = document.getElementById("others");
 
   // ------------------------------------------------------------- state
@@ -61,6 +60,7 @@
     calm:     { anim: "auto",  frameMs: 550, speed: 18 },
     sleepy:   { anim: "idle",  frameMs: 900, speed: 0 },
     anxious:  { anim: "walk",  frameMs: 150, speed: 55 },
+    overage:  { anim: "walk",  frameMs: 170, speed: 48 }, // plan dry, credits burning: still up, pacing
     depleted: { anim: "sleep", frameMs: 1100, speed: 0 },
     lost:     { anim: "sleep", frameMs: 1300, speed: 0 },
     unknown:  { anim: "auto",  frameMs: 550, speed: 18 }, // no data yet: stroll like calm
@@ -92,8 +92,10 @@
     calm: ["悠哉悠哉…", "代码和我, 你先看谁?", "嗯哼~ ♪", "伸个懒腰…"],
     sleepy: ["有点困了…", "额度有点紧张了哦", "省着点问 Claude 呀…"],
     anxious: ["额度快没啦!!", "💦 要不要歇一会?", "快到极限了…"],
+    overage: ["在烧额外用量啦 💸", "钱包在冒烟…悠着点", "按量计费中, 省着点问"],
   };
   let COMBO = "别 rua 了别 rua 了!!";
+  let RESET_LINE = "额度重置啦!! ✦";
   let BEG = "求求你🥺给点纯血 token 吧～";
   let MICRO_LINES = { yawn: "哈啊~ 有点困…", stretch: "唔~ 伸个懒腰!" };
   // custom pixel buddies (loved ones) have no per-character lines; use these
@@ -104,7 +106,11 @@
 
   // ------------------------------------------------------------- pet brain
   // shared, kept identical between the floating pet and the Dynamic Island
-  const { computeMode, fmtCd, drawPet, frameCount, mergeCustomPets, renderOthers } = window.PetCore;
+  const {
+    computeMode, fmtCd, drawPet, frameCount, mergeCustomPets,
+    renderOthers, renderScoped, renderExtra, renderBreakdown,
+    blockingWindow, lockedReason,
+  } = window.PetCore;
 
   function drawFrame(t) {
     const begging = t < begUntil;
@@ -214,11 +220,10 @@
   function refreshHud() {
     setBar(bar5, pct5, reset5, usage && usage.fiveHour);
     setBar(barw, pctw, resetw, usage && usage.week);
-    // Fable gets its own bar — the priciest window deserves its own warning
-    const fable = usage && usage.fable;
-    rowFable.classList.toggle("hidden", !fable);
-    resetf.classList.toggle("hidden", !fable);
-    if (fable) setBar(barf, pctf, resetf, fable);
+    // model-scoped weekly limits (Fable ✦ …), usage credits, where the week went
+    renderScoped(scopedEl, usage);
+    renderExtra(extraEl, usage);
+    renderBreakdown(breakdownEl, usage);
     renderOthers(othersEl, usage && usage.others);
     nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
 
@@ -231,9 +236,14 @@
       show(msgEl, "🚦 " + (errorDetail || t("err.rate")));
     } else if (errorCode) {
       show(msgEl, t("err.fetch") + (errorDetail ? " · " + errorDetail.slice(0, 90) : ""));
-    } else if (mode === "depleted" && usage && usage.fiveHour) {
-      const cd = fmtCd(usage.fiveHour.resetsAt);
-      show(msgEl, t("msg.depleted") + " " + (cd || ""));
+    } else if (mode === "overage") {
+      show(msgEl, t("msg.overage"));
+    } else if (mode === "depleted" && usage) {
+      const lock = lockedReason(usage);
+      const win = blockingWindow(usage);
+      const cd = win ? fmtCd(win.resetsAt) : null;
+      if (lock) show(msgEl, t("msg.locked").replace("{reason}", lock));
+      else show(msgEl, t("msg.depleted") + " " + (cd || "") + (usage.extra && usage.extra.enabled ? " · " + t("hud.extraCapped") : ""));
     }
   }
   function show(el, text) {
@@ -244,8 +254,8 @@
   let bubbleTimer = null;
   function refreshBubble() {
     clearTimeout(bubbleTimer);
-    if (mode === "depleted" || mode === "lost") {
-      bubble.textContent = mode === "lost" ? "?" : t("bubble.zzz");
+    if (mode === "depleted" || mode === "lost" || mode === "overage") {
+      bubble.textContent = mode === "lost" ? "?" : mode === "overage" ? "💸" : t("bubble.zzz");
       bubble.classList.remove("hidden");
     } else {
       bubble.classList.add("hidden");
@@ -402,7 +412,7 @@
 
   function togglePause() {
     paused = !paused;
-    sayTemp(paused ? "⏸ 原地休息~" : "▶ 继续散步!", 1600);
+    sayTemp(paused ? t("pet.pause") : t("pet.resume"), 1600);
   }
 
   // ------------------------------------------------------------- buttons
@@ -431,7 +441,7 @@
   });
   api.onCelebrate(() => {
     celebrateUntil = performance.now() + 2600;
-    sayTemp("额度重置啦!! ✦", 2600);
+    sayTemp(RESET_LINE, 2600);
     let n = 0;
     const tick = setInterval(() => {
       spawnFx(["✦", "★", "♥"][n % 3]);
@@ -461,6 +471,7 @@
     if (d.lines) {
       CLICK_LINES = d.lines.click; FEED_LINES = d.lines.feed; QUIPS = d.lines.quips;
       COMBO = d.lines.combo; BEG = d.lines.beg;
+      if (d.lines.reset) RESET_LINE = d.lines.reset;
       if (d.lines.micro) MICRO_LINES = d.lines.micro;
       if (d.lines.buddy) BUDDY_LINES = d.lines.buddy;
     }
@@ -476,7 +487,8 @@
     if (usage) {
       setBar(bar5, pct5, reset5, usage.fiveHour);
       setBar(barw, pctw, resetw, usage.week);
-      if (usage.fable) setBar(barf, pctf, resetf, usage.fable);
+      renderScoped(scopedEl, usage);
+      renderExtra(extraEl, usage);
     }
   }, 1000);
 

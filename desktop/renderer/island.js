@@ -6,7 +6,11 @@
   "use strict";
   const api = window.petAPI;
   const t = window.t;   // i18n lookup (reads window.I18N live)
-  const { computeMode, fmtCd, drawPet, frameCount, mergeCustomPets, renderOthers } = window.PetCore;
+  const {
+    computeMode, fmtCd, drawPet, frameCount, mergeCustomPets,
+    renderOthers, renderScoped, renderExtra, renderBreakdown,
+    blockingWindow, lockedReason,
+  } = window.PetCore;
 
   const charsNow = () => Object.keys(SPRITES.frames);
   let character = "cat";
@@ -25,10 +29,9 @@
   const pctw = document.getElementById("pctw");
   const reset5 = document.getElementById("reset5");
   const resetw = document.getElementById("resetw");
-  const rowFable = document.getElementById("row-fable");
-  const barf = document.getElementById("barf");
-  const pctf = document.getElementById("pctf");
-  const resetf = document.getElementById("resetf");
+  const scopedEl = document.getElementById("scoped");
+  const extraEl = document.getElementById("extra");
+  const breakdownEl = document.getElementById("breakdown");
   const othersEl = document.getElementById("others");
 
   // ------------------------------------------------------------- state
@@ -49,6 +52,7 @@
     calm:     { state: "idle",  frameMs: 550 },
     sleepy:   { state: "idle",  frameMs: 900 },
     anxious:  { state: "walk",  frameMs: 160 },
+    overage:  { state: "walk",  frameMs: 180 }, // plan dry, credits burning
     depleted: { state: "sleep", frameMs: 1100 },
     lost:     { state: "sleep", frameMs: 1300 },
     unknown:  { state: "idle",  frameMs: 600 },
@@ -114,13 +118,13 @@
   function rafLoop(t) { tick(t); requestAnimationFrame(rafLoop); }
 
   // ------------------------------------------------------------- usage / hud
-  // grow the expanded capsule to fit extra rows (Fable / other agents),
-  // capped just under the 360px host window
+  // grow the expanded capsule to fit extra rows (scoped limits / extra usage /
+  // breakdown / other agents), capped just under the 420px host window
   function fitExpanded() {
     const body = document.querySelector(".body");
     if (!body) return;
     const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bar-h")) || 32;
-    const h = Math.max(300, Math.min(352, barH + body.scrollHeight + 6));
+    const h = Math.max(300, Math.min(412, barH + body.scrollHeight + 6));
     document.documentElement.style.setProperty("--expanded-h", h + "px");
   }
 
@@ -138,6 +142,7 @@
   function refreshMini() {
     if (errorCode === "no-credentials" || errorCode === "auth") { miniPct.textContent = "?"; miniPct.className = ""; return; }
     if (errorCode === "rate-limit") { miniPct.textContent = "🚦"; miniPct.className = ""; return; }
+    if (mode === "overage") { miniPct.textContent = "💸"; miniPct.className = "danger"; return; }
     const f = usage && usage.fiveHour ? Math.round(usage.fiveHour.pct) : null;
     if (f === null) { miniPct.textContent = "··"; miniPct.className = ""; return; }
     miniPct.textContent = f + "%";
@@ -147,19 +152,24 @@
   function refreshBody() {
     setBar(bar5, pct5, reset5, usage && usage.fiveHour);
     setBar(barw, pctw, resetw, usage && usage.week);
-    const fable = usage && usage.fable;
-    rowFable.classList.toggle("hidden", !fable);
-    resetf.classList.toggle("hidden", !fable);
-    if (fable) setBar(barf, pctf, resetf, fable);
+    renderScoped(scopedEl, usage);
+    renderExtra(extraEl, usage);
+    renderBreakdown(breakdownEl, usage);
     renderOthers(othersEl, usage && usage.others);
-    fitExpanded();
     nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
     msgEl.classList.add("hidden");
     if (errorCode === "no-credentials") show(msgEl, t("err.noCreds"));
     else if (errorCode === "auth") show(msgEl, t("err.auth"));
     else if (errorCode === "rate-limit") show(msgEl, "🚦 " + (errorDetail || t("err.rate")));
     else if (errorCode) show(msgEl, t("err.fetch") + (errorDetail ? " · " + errorDetail.slice(0, 80) : ""));
-    else if (mode === "depleted" && usage && usage.fiveHour) show(msgEl, t("msg.depleted") + " " + (fmtCd(usage.fiveHour.resetsAt) || ""));
+    else if (mode === "overage") show(msgEl, t("msg.overage"));
+    else if (mode === "depleted" && usage) {
+      const lock = lockedReason(usage);
+      const win = blockingWindow(usage);
+      if (lock) show(msgEl, t("msg.locked").replace("{reason}", lock));
+      else show(msgEl, t("msg.depleted") + " " + ((win && fmtCd(win.resetsAt)) || "") + (usage.extra && usage.extra.enabled ? " · " + t("hud.extraCapped") : ""));
+    }
+    fitExpanded();   // after the message box exists, so it's counted in the height
   }
   function show(el, text) { el.textContent = text; el.classList.remove("hidden"); }
 
@@ -174,8 +184,8 @@
   let bubbleTimer = null;
   function refreshBubble() {
     clearTimeout(bubbleTimer);
-    if (mode === "depleted" || mode === "lost") {
-      bubble.textContent = mode === "lost" ? "?" : t("bubble.zzz");
+    if (mode === "depleted" || mode === "lost" || mode === "overage") {
+      bubble.textContent = mode === "lost" ? "?" : mode === "overage" ? "💸" : t("bubble.zzz");
       bubble.classList.remove("hidden");
     } else {
       bubble.classList.add("hidden");
@@ -303,7 +313,7 @@
   document.getElementById("game").addEventListener("click", () => { if (window.PetGames) window.PetGames.open(); });
 
   // ------------------------------------------------------------- host events
-  const MOOD_ORDER = { happy: 0, calm: 1, sleepy: 2, anxious: 3, depleted: 4 };
+  const MOOD_ORDER = { happy: 0, calm: 1, sleepy: 2, anxious: 3, overage: 4, depleted: 5 };
   const knownMood = (m) => m in MOOD_ORDER;
   api.onUsage((d) => {
     const prev = mode;
@@ -362,7 +372,8 @@
     if (usage) {
       setBar(bar5, pct5, reset5, usage.fiveHour);
       setBar(barw, pctw, resetw, usage.week);
-      if (usage.fable) setBar(barf, pctf, resetf, usage.fable);
+      renderScoped(scopedEl, usage);
+      renderExtra(extraEl, usage);
     }
   }, 1000);
 

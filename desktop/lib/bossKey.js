@@ -95,9 +95,20 @@ function createBossController(opts) {
     try {
       const { GlobalKeyboardListener } = require("node-global-key-listener");
       listener = new GlobalKeyboardListener();
-      listener.addListener((e) => {
+      const started = listener.addListener((e) => {
         if (e && e.state === "DOWN" && e.name === "ESCAPE") onEsc();
       });
+      // the helper binary is spawned lazily, so a spawn failure rejects here
+      // asynchronously (e.g. EBADARCH: the stock x86_64 MacKeyServer on an
+      // Apple-Silicon Mac without Rosetta) — never let it become an
+      // unhandled rejection; ⌘⇧B keeps working
+      if (started && typeof started.catch === "function") {
+        started.catch((err) => {
+          console.warn("[bossKey] global key hook failed to start — using ⌘⇧B fallback:", err && err.message);
+          try { listener && listener.kill(); } catch { /* ignore */ }
+          listener = null;
+        });
+      }
       return true;
     } catch (err) {
       console.warn("[bossKey] global key hook unavailable — using ⌘⇧B fallback:", err && err.message);

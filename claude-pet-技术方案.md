@@ -2,6 +2,8 @@
 
 > 目标：在 VS Code 内养一只 8-bit 像素宠物，实时展示 Claude Max 计划的 5 小时 session 用量、每周用量、剩余额度与重置倒计时。宠物可拖动、可隐藏。
 
+> **现状（2026-10）**：本文是最初的 VS Code 扩展方案。实际落地为 [`desktop/`](desktop/)（Electron 悬浮桌宠 / 灵动岛，macOS + Windows）和 [`web/`](web/)（手机 PWA）；第 2 节的数据层设计原样沿用，端点返回结构见 2.1 末尾的更新。
+
 ---
 
 ## 1. 总体架构
@@ -49,6 +51,29 @@ Headers:
   "seven_day_opus": { ... }
 }
 ```
+
+**2026-10 实际返回（已抓包，样本在 `desktop/test/fixtures/usage-2026-10.json`）**：上面的老字段还在，但真正的数据源变成了结构化列表，解析器（`desktop/lib/usageClient.js`）优先读它、老字段只做回退：
+
+```json
+{
+  "limits": [
+    { "kind": "session",       "group": "session", "percent": 33, "severity": "normal", "resets_at": "…", "scope": null, "is_active": false },
+    { "kind": "weekly_all",    "group": "weekly",  "percent": 53, "severity": "normal", "resets_at": "…", "scope": null, "is_active": true },
+    { "kind": "weekly_scoped", "group": "weekly",  "percent": 9,  "severity": "normal", "resets_at": "…",
+      "scope": { "model": { "id": null, "display_name": "Fable" }, "surface": null }, "is_active": false }
+  ],
+  "weekly_scoped_shares": [ { "limit_index": 2, "used_percent_of_weekly": 5, "allowance_percent_of_weekly": 50 } ],
+  "extra_usage": { "is_enabled": false, "monthly_limit": null, "used_credits": 0, "utilization": null, "currency": "SGD", "decimal_places": 2, "disabled_reason": "out_of_credits", "spend_limit_reached": false, "…": "…" },
+  "spend": { "used": { "amount_minor": 0, "currency": "SGD", "exponent": 2 }, "percent": 0, "enabled": false, "…": "…" },
+  "seven_day_breakdown": { "rows": [ { "key": "claude_code", "display_name": "Claude Code", "percent": 79 }, { "key": "cowork", "display_name": "Cowork", "percent": 19 }, { "key": "chat", "display_name": "Chats", "percent": 2 } ] },
+  "five_hour": { "utilization": 33, "resets_at": "…", "limit_dollars": null, "used_dollars": null, "locked_reason": null },
+  "seven_day": { "…": "…" },
+  "seven_day_opus": null, "seven_day_sonnet": null,
+  "tangelo": null, "iguana_necktie": { "…": "obfuscated experiment keys — ignored" }
+}
+```
+
+要点：模型专属周额度（Fable ✦）只出现在 `limits[]` 里（顶层没有 `fable` 键），标签取 `scope.model.display_name`；`extra_usage` / `spend` 是「额外用量」（计划额度用完后按量计费的积分），金额为最小货币单位整数（`decimal_places` / `exponent`）；`locked_reason` 非空表示该窗口被锁定。
 
 ### 2.2 凭证读取
 

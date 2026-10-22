@@ -1,22 +1,66 @@
 /* Claude Pet — shared pure helpers used by both renderers (floating pet &
-   Dynamic Island). Keeping mood thresholds, countdown formatting and the
-   sprite drawing in one place stops the two skins from drifting apart.
-   Depends on the global SPRITES (sprites.js) being loaded first. */
+   Dynamic Island). Keeping mood thresholds, countdown formatting, the usage
+   rows and the sprite drawing in one place stops the two skins from drifting
+   apart. Depends on the global SPRITES (sprites.js) being loaded first.
+   Loadable under node for tests (shim `window` + `SPRITES`). */
 (function () {
   "use strict";
 
+  const tt = (k) => (typeof window !== "undefined" && typeof window.t === "function" ? window.t(k) : k);
+  const FABLE_RE = /fable|mythos/i;
+
+  // every model/surface-scoped weekly limit; cached payloads from <0.2.0 only
+  // carried `fable`, so fall back to that
+  function scopedList(usage) {
+    if (!usage) return [];
+    if (Array.isArray(usage.scoped)) return usage.scoped.filter(Boolean);
+    return usage.fable ? [{ key: "fable", label: "Fable", sharePct: null, ...usage.fable }] : [];
+  }
+
+  // ---- mood logic. Mirrors lib/usageClient.js (planExhausted / extraActive /
+  // isOverage) — test/mood.test.js keeps both sides identical. ----
+  function lockedReason(u) {
+    if (!u) return null;
+    return (u.fiveHour && u.fiveHour.lockedReason) || (u.week && u.week.lockedReason) || null;
+  }
+  // plan limits exhausted (or locked): Claude itself is blocked
+  function planExhausted(u) {
+    if (!u) return false;
+    if (lockedReason(u)) return true;
+    const f = u.fiveHour, w = u.week;
+    return !!((f && f.pct >= 99.5) || (w && w.pct >= 99.5));
+  }
+  // extra usage (usage credits) is carrying the load right now
+  function extraActive(u) {
+    const ex = u && u.extra;
+    if (!ex || !ex.enabled || ex.spendLimitReached) return false;
+    if (typeof ex.pct === "number" && ex.pct >= 99.5) return false;
+    return true;
+  }
+  function isOverage(u) {
+    if (!u || lockedReason(u)) return false;
+    return planExhausted(u) && extraActive(u);
+  }
+  // the window that keeps Claude blocked (latest reset wins when both are dry)
+  function blockingWindow(u) {
+    if (!u) return null;
+    const c = [u.fiveHour, u.week].filter((w) => w && (w.pct >= 99.5 || w.lockedReason));
+    if (!c.length) return u.fiveHour || u.week || null;
+    return c.reduce((a, b) => (Date.parse(b.resetsAt || "") > Date.parse(a.resetsAt || "") ? b : a));
+  }
+
   // usage → mood. errorCode short-circuits to "lost". Mirrors the thresholds
   // the whole app reacts to, so it lives here as the single source of truth.
-  // Fable (the priciest window) counts toward the pet's anxiety; when Claude
-  // itself is off but other agents (Codex/OpenClaw/自定义) are tracked, their
-  // worst window drives the mood instead so the pet never plays dead.
+  // Scoped windows (Fable ✦ etc., the priciest ones) count toward anxiety; a
+  // dry plan with usage credits enabled is "overage" (still working, burning
+  // money) instead of "depleted". When Claude itself is off but other agents
+  // (Codex/OpenClaw/自定义) are tracked, their worst window drives the mood
+  // instead so the pet never plays dead.
   function computeMode(usage, errorCode) {
     if (errorCode === "no-credentials" || errorCode === "auth") return "lost";
     if (!usage) return "unknown";
-    const f = usage.fiveHour ? usage.fiveHour.pct : 0;
-    const w = usage.week ? usage.week.pct : 0;
-    const fb = usage.fable ? usage.fable.pct : 0;
-    if (!usage.fiveHour && !usage.week && !usage.fable) {
+    const scoped = scopedList(usage);
+    if (!usage.fiveHour && !usage.week && !scoped.length) {
       const winds = [];
       (usage.others || []).forEach((p) => (p.windows || []).forEach((x) => {
         if (x && typeof x.pct === "number") winds.push(x.pct);
@@ -29,8 +73,10 @@
       if (worst >= 40) return "calm";
       return "happy";
     }
-    const worst = Math.max(f, w, fb);
-    if (f >= 99.5 || w >= 99.5) return "depleted";
+    if (planExhausted(usage)) return isOverage(usage) ? "overage" : "depleted";
+    const f = usage.fiveHour ? usage.fiveHour.pct : 0;
+    const w = usage.week ? usage.week.pct : 0;
+    const worst = Math.max(f, w, ...scoped.map((s) => (typeof s.pct === "number" ? s.pct : 0)));
     if (worst >= 90) return "anxious";
     if (worst >= 70) return "sleepy";
     if (worst >= 40) return "calm";
@@ -53,6 +99,26 @@
       ? (h >= 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`)
       : (h >= 24 ? `${Math.floor(h / 24)} 天 ${h % 24} 小时` : h > 0 ? `${h} 小时 ${String(m).padStart(2, "0")} 分` : `${m} 分钟`);
     return en ? `${cd} left · ${local}` : `${cd}后重置 · ${local}`;
+  }
+
+  // amount in major units → "S$12.34" (falls back to "SGD 12.34")
+  function fmtMoney(v, cur) {
+    if (typeof v !== "number" || !isFinite(v)) return null;
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency: cur || "USD", maximumFractionDigits: 2 }).format(v);
+    } catch {
+      return (cur ? cur + " " : "$") + v.toFixed(2);
+    }
+  }
+  // " · 24% · S$12.34 / S$50.00" for the overage HUD line
+  function extraSummary(u) {
+    const ex = u && u.extra;
+    if (!ex) return "";
+    const bits = [];
+    if (typeof ex.pct === "number") bits.push(Math.round(ex.pct) + "%");
+    const used = fmtMoney(ex.used, ex.currency), lim = fmtMoney(ex.limit, ex.currency);
+    if (used) bits.push(lim ? used + " / " + lim : used);
+    return bits.length ? " · " + bits.join(" · ") : "";
   }
 
   // Draw a 16×16 pixel pet onto a 2d context. animState is one of
@@ -115,6 +181,107 @@
     });
   }
 
+  // ---- usage rows (DOM-only, shared by both HUD skins) ----
+  // one "label ▓▓▓░░ 42%" row plus its "↻ reset" line
+  function makeRow(labelText, cls) {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    const label = document.createElement("span");
+    label.className = "bar-label" + (cls ? " " + cls : "");
+    label.textContent = labelText;
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    const fill = document.createElement("div");
+    fill.className = "bar-fill" + (cls ? " " + cls : "");
+    bar.appendChild(fill);
+    const pctEl = document.createElement("span");
+    pctEl.className = "bar-pct";
+    row.appendChild(label); row.appendChild(bar); row.appendChild(pctEl);
+    const line = document.createElement("div");
+    line.className = "reset-line hidden";
+    return { row, label, fill, pctEl, line };
+  }
+  function fillBar(parts, win) {
+    const pct = win && typeof win.pct === "number" ? Math.round(win.pct) : null;
+    parts.fill.style.width = pct === null ? "0%" : Math.min(100, pct) + "%";
+    parts.fill.classList.toggle("warn", pct !== null && pct >= 70 && pct < 90);
+    parts.fill.classList.toggle("danger", pct !== null && pct >= 90);
+    parts.pctEl.textContent = pct === null ? "--%" : pct + "%";
+    const cd = win && win.resetsAt ? fmtCd(win.resetsAt) : null;
+    parts.line.textContent = cd ? "↻ " + cd : "";
+    parts.line.classList.toggle("hidden", !cd);
+  }
+  // "Fable" → "F✦": one letter + the scoped-limit star fits the label column
+  function abbr(label) {
+    const s = String(label || "").trim();
+    return (s ? s[0].toUpperCase() : "?") + "✦";
+  }
+
+  // Model-scoped weekly limits (Fable ✦ …). Rows are rebuilt only when the
+  // set of limits changes; otherwise updated in place so bars don't flicker.
+  function renderScoped(container, usage) {
+    if (!container) return;
+    const list = scopedList(usage);
+    const sig = list.map((s) => s.key + "|" + s.label).join(";");
+    if (container.dataset.sig !== sig) {
+      container.textContent = "";
+      container.dataset.sig = sig;
+      container._rows = list.map((s) => {
+        const parts = makeRow(abbr(s.label), FABLE_RE.test(s.label) ? "fable" : "scoped");
+        container.appendChild(parts.row);
+        container.appendChild(parts.line);
+        return parts;
+      });
+    }
+    list.forEach((s, i) => {
+      const parts = container._rows[i];
+      fillBar(parts, s);
+      const share = typeof s.sharePct === "number"
+        ? " · " + tt("hud.share").replace("{pct}", String(Math.round(s.sharePct))) : "";
+      parts.label.title = s.label + share;
+    });
+  }
+
+  // Extra usage (usage credits past the plan limits) — shown only when enabled
+  function renderExtra(container, usage) {
+    if (!container) return;
+    const ex = usage && usage.extra;
+    const on = !!(ex && ex.enabled);
+    container.classList.toggle("hidden", !on);
+    if (!on) return;
+    if (!container._parts) {
+      container.textContent = "";
+      const parts = makeRow("💸", "extra");
+      container.appendChild(parts.row);
+      container.appendChild(parts.line);
+      container._parts = parts;
+    }
+    const parts = container._parts;
+    parts.label.title = tt("hud.extra");
+    const hasPct = typeof ex.pct === "number";
+    fillBar(parts, hasPct ? { pct: ex.pct } : null);
+    if (!hasPct) parts.pctEl.textContent = "∞";   // no monthly cap: pay as you go
+    const used = fmtMoney(ex.used, ex.currency), lim = fmtMoney(ex.limit, ex.currency);
+    let line = used ? tt("hud.extraUsed").replace("{used}", used) : "";
+    if (used && lim) line += " / " + lim;
+    if (ex.spendLimitReached) line += (line ? " · " : "") + tt("hud.extraCapped");
+    parts.line.textContent = line;
+    parts.line.classList.toggle("hidden", !line);
+  }
+
+  // "本周去向: Claude Code 79% · Cowork 19% · Chats 2%"
+  function renderBreakdown(container, usage) {
+    if (!container) return;
+    const b = usage && usage.breakdown;
+    const rows = b && Array.isArray(b.rows)
+      ? b.rows.filter((r) => r && typeof r.pct === "number" && r.pct > 0).sort((a, c) => c.pct - a.pct).slice(0, 4)
+      : [];
+    container.classList.toggle("hidden", !rows.length);
+    if (!rows.length) return;
+    container.textContent = tt("hud.breakdown") + ": " +
+      rows.map((r) => r.label + " " + Math.round(r.pct) + "%").join(" · ");
+  }
+
   // Render the "other agents" usage rows (Codex, OpenClaw 龙虾, custom JSON…)
   // into a container. Kept DOM-only so both HUD skins share it.
   function renderOthers(container, others) {
@@ -127,35 +294,18 @@
       name.textContent = p.label || p.id;
       container.appendChild(name);
       p.windows.slice(0, 3).forEach((w) => {
-        const row = document.createElement("div");
-        row.className = "bar-row";
-        const label = document.createElement("span");
-        label.className = "bar-label";
-        label.textContent = w.label || "";
-        const bar = document.createElement("div");
-        bar.className = "bar";
-        const fill = document.createElement("div");
-        fill.className = "bar-fill";
-        const pct = typeof w.pct === "number" ? Math.round(w.pct) : null;
-        fill.style.width = pct === null ? "0%" : Math.min(100, pct) + "%";
-        if (pct !== null && pct >= 90) fill.classList.add("danger");
-        else if (pct !== null && pct >= 70) fill.classList.add("warn");
-        bar.appendChild(fill);
-        const pctEl = document.createElement("span");
-        pctEl.className = "bar-pct";
-        pctEl.textContent = pct === null ? "--%" : pct + "%";
-        row.appendChild(label); row.appendChild(bar); row.appendChild(pctEl);
-        container.appendChild(row);
-        const cd = w.resetsAt ? fmtCd(w.resetsAt) : null;
-        if (cd) {
-          const line = document.createElement("div");
-          line.className = "reset-line";
-          line.textContent = "↻ " + cd;
-          container.appendChild(line);
-        }
+        const parts = makeRow(w.label || "", "");
+        fillBar(parts, w);
+        container.appendChild(parts.row);
+        container.appendChild(parts.line);
       });
     });
   }
 
-  window.PetCore = { computeMode, fmtCd, drawPet, frameCount, mergeCustomPets, renderOthers };
+  window.PetCore = {
+    computeMode, planExhausted, extraActive, isOverage, blockingWindow, lockedReason, scopedList,
+    fmtCd, fmtMoney, extraSummary,
+    drawPet, frameCount, mergeCustomPets,
+    renderOthers, renderScoped, renderExtra, renderBreakdown,
+  };
 })();

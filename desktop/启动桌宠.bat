@@ -14,8 +14,14 @@ if errorlevel 1 (
 )
 
 if not exist "node_modules" (
-  echo  第一次运行，正在下载依赖（约 1-2 分钟）...
+  echo  第一次运行，正在安装依赖...
   call npm install
+)
+
+rem Electron 42+ 在第一次运行时才下载本体——这里先显式下载一次
+if not exist "node_modules\electron\dist" (
+  echo  正在下载 Electron 本体（约 1-2 分钟，只需一次）...
+  call npx install-electron
 )
 
 echo  启动桌宠中...

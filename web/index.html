@@ -48,6 +48,11 @@
         <span id="pctw" class="bar-pct">--%</span></div>
       <div id="resetw" class="reset-line"></div>
 
+      <!-- model-scoped weekly limits (Fable ✦ …) / extra usage / where the week went -->
+      <div id="scoped"></div>
+      <div id="extra" class="hidden"></div>
+      <div id="breakdown" class="breakdown hidden"></div>
+
       <div id="msg" class="hidden"></div>
 
       <div class="action-row">
@@ -85,6 +90,10 @@
         <label class="field half">
           <span>手动 周 %</span>
           <input id="f-week" type="number" min="0" max="100" inputmode="numeric" placeholder="如 55">
+        </label>
+        <label class="field half">
+          <span>手动 Fable ✦ %</span>
+          <input id="f-fable" type="number" min="0" max="100" inputmode="numeric" placeholder="可选">
         </label>
       </div>
 

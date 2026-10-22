@@ -272,3 +272,21 @@ html, body {
 .settings-actions .pix-btn { flex: 1; }
 
 .hidden { display: none !important; }
+
+/* ---------------- 0.2.0: scoped limits / extra usage / breakdown ---------------- */
+/* Fable ✦ (Mythos-tier) weekly window — violet; other scoped windows — teal */
+.bar-label.fable { color: #b39ddb; }
+.bar-fill.fable { background-color: #8e7cc3; }
+.bar-label.scoped { color: #8fc7d8; }
+.bar-fill.scoped { background-color: #5aa7bd; }
+/* extra usage (usage credits past the plan limits) — gold */
+.bar-label.extra { color: #e0c070; }
+.bar-fill.extra { background-color: #c9a227; }
+.bar-fill.fable.warn, .bar-fill.scoped.warn, .bar-fill.extra.warn { background-color: var(--warn); }
+.bar-fill.fable.danger, .bar-fill.scoped.danger, .bar-fill.extra.danger { background-color: var(--danger); }
+.breakdown {
+  margin-top: 6px;
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.4;
+}

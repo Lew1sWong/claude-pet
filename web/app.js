@@ -8,7 +8,7 @@
   // ------------------------------------------------------------- storage
   const LS = {
     token: "cp_token", proxy: "cp_proxy",
-    five: "cp_five", week: "cp_week", char: "cp_char",
+    five: "cp_five", week: "cp_week", fable: "cp_fable", char: "cp_char",
   };
   const get = (k) => localStorage.getItem(k);
   const set = (k, v) => (v === null || v === "" ? localStorage.removeItem(k) : localStorage.setItem(k, v));
@@ -31,6 +31,9 @@
   const pctw = document.getElementById("pctw");
   const reset5 = document.getElementById("reset5");
   const resetw = document.getElementById("resetw");
+  const scopedEl = document.getElementById("scoped");
+  const extraEl = document.getElementById("extra");
+  const breakdownEl = document.getElementById("breakdown");
   const footHint = document.getElementById("foot-hint");
 
   // ------------------------------------------------------------- state
@@ -57,6 +60,7 @@
     calm:     { anim: "auto",  frameMs: 550, speed: 18 },
     sleepy:   { anim: "idle",  frameMs: 900, speed: 0 },
     anxious:  { anim: "walk",  frameMs: 150, speed: 55 },
+    overage:  { anim: "walk",  frameMs: 170, speed: 48 }, // plan dry, credits burning
     depleted: { anim: "sleep", frameMs: 1100, speed: 0 },
     lost:     { anim: "sleep", frameMs: 1300, speed: 0 },
     unknown:  { anim: "auto",  frameMs: 550, speed: 18 },
@@ -85,16 +89,42 @@
     calm: ["悠哉悠哉…", "嗯哼~ ♪", "伸个懒腰…", "今天也要加油"],
     sleepy: ["有点困了…", "额度有点紧张了哦", "省着点问 Claude 呀…"],
     anxious: ["额度快没啦!!", "💦 要不要歇一会?", "快到极限了…"],
+    overage: ["在烧额外用量啦 💸", "钱包在冒烟…悠着点", "按量计费中, 省着点问"],
   };
 
   // ------------------------------------------------------------- pet brain
+  // (mirrors desktop/renderer/petcore.js — keep the thresholds identical)
+  const scopedList = (u) => (u && Array.isArray(u.scoped) ? u.scoped.filter(Boolean) : []);
+  function lockedReason(u) {
+    if (!u) return null;
+    return (u.fiveHour && u.fiveHour.lockedReason) || (u.week && u.week.lockedReason) || null;
+  }
+  function planExhausted(u) {
+    if (!u) return false;
+    if (lockedReason(u)) return true;
+    const f = u.fiveHour, w = u.week;
+    return !!((f && f.pct >= 99.5) || (w && w.pct >= 99.5));
+  }
+  function extraActive(u) {
+    const ex = u && u.extra;
+    if (!ex || !ex.enabled || ex.spendLimitReached) return false;
+    if (typeof ex.pct === "number" && ex.pct >= 99.5) return false;
+    return true;
+  }
+  function isOverage(u) { return !!u && !lockedReason(u) && planExhausted(u) && extraActive(u); }
+  function blockingWindow(u) {
+    if (!u) return null;
+    const c = [u.fiveHour, u.week].filter((w) => w && (w.pct >= 99.5 || w.lockedReason));
+    if (!c.length) return u.fiveHour || u.week || null;
+    return c.reduce((a, b) => (Date.parse(b.resetsAt || "") > Date.parse(a.resetsAt || "") ? b : a));
+  }
   function computeMode() {
     if (errorCode === "no-credentials" || errorCode === "auth") return "lost";
     if (!usage) return "unknown";
+    if (planExhausted(usage)) return isOverage(usage) ? "overage" : "depleted";
     const f = usage.fiveHour ? usage.fiveHour.pct : 0;
     const w = usage.week ? usage.week.pct : 0;
-    const worst = Math.max(f, w);
-    if (f >= 99.5 || w >= 99.5) return "depleted";
+    const worst = Math.max(f, w, ...scopedList(usage).map((s) => (typeof s.pct === "number" ? s.pct : 0)));
     if (worst >= 90) return "anxious";
     if (worst >= 70) return "sleepy";
     if (worst >= 40) return "calm";
@@ -220,9 +250,85 @@
     lineEl.textContent = cd ? "↻ " + cd : "";
   }
 
+  // ---- extra rows: model-scoped limits (Fable ✦ …), extra usage, breakdown ----
+  function fmtMoney(v, cur) {
+    if (typeof v !== "number" || !isFinite(v)) return null;
+    try { return new Intl.NumberFormat(undefined, { style: "currency", currency: cur || "USD", maximumFractionDigits: 2 }).format(v); }
+    catch { return (cur ? cur + " " : "$") + v.toFixed(2); }
+  }
+  function makeRow(labelText, cls) {
+    const row = document.createElement("div"); row.className = "bar-row";
+    const label = document.createElement("span"); label.className = "bar-label" + (cls ? " " + cls : ""); label.textContent = labelText;
+    const bar = document.createElement("div"); bar.className = "bar";
+    const fill = document.createElement("div"); fill.className = "bar-fill" + (cls ? " " + cls : "");
+    bar.appendChild(fill);
+    const pctEl = document.createElement("span"); pctEl.className = "bar-pct";
+    row.appendChild(label); row.appendChild(bar); row.appendChild(pctEl);
+    const line = document.createElement("div"); line.className = "reset-line hidden";
+    return { row, label, fill, pctEl, line };
+  }
+  function fillBar(parts, win) {
+    const pct = win && typeof win.pct === "number" ? Math.round(win.pct) : null;
+    parts.fill.style.width = pct === null ? "0%" : Math.min(100, pct) + "%";
+    parts.fill.classList.toggle("warn", pct !== null && pct >= 70 && pct < 90);
+    parts.fill.classList.toggle("danger", pct !== null && pct >= 90);
+    parts.pctEl.textContent = pct === null ? "--%" : pct + "%";
+    const cd = win && win.resetsAt ? fmtCd(win.resetsAt) : null;
+    parts.line.textContent = cd ? "↻ " + cd : "";
+    parts.line.classList.toggle("hidden", !cd);
+  }
+  const FABLE_RE = /fable|mythos/i;
+  function renderScoped() {
+    const list = scopedList(usage);
+    const sig = list.map((s) => s.key + "|" + s.label).join(";");
+    if (scopedEl.dataset.sig !== sig) {
+      scopedEl.textContent = "";
+      scopedEl.dataset.sig = sig;
+      scopedEl._rows = list.map((s) => {
+        const parts = makeRow((String(s.label || "?")[0] || "?").toUpperCase() + "✦", FABLE_RE.test(s.label) ? "fable" : "scoped");
+        scopedEl.appendChild(parts.row); scopedEl.appendChild(parts.line);
+        return parts;
+      });
+    }
+    list.forEach((s, i) => {
+      fillBar(scopedEl._rows[i], s);
+      scopedEl._rows[i].label.title = s.label + (typeof s.sharePct === "number" ? " · 占周额度的 " + Math.round(s.sharePct) + "%" : "");
+    });
+  }
+  function renderExtra() {
+    const ex = usage && usage.extra;
+    const on = !!(ex && ex.enabled);
+    extraEl.classList.toggle("hidden", !on);
+    if (!on) return;
+    if (!extraEl._parts) {
+      extraEl.textContent = "";
+      const parts = makeRow("💸", "extra");
+      extraEl.appendChild(parts.row); extraEl.appendChild(parts.line);
+      extraEl._parts = parts;
+    }
+    const parts = extraEl._parts;
+    parts.label.title = "额外用量";
+    const hasPct = typeof ex.pct === "number";
+    fillBar(parts, hasPct ? { pct: ex.pct } : null);
+    if (!hasPct) parts.pctEl.textContent = "∞";
+    const used = fmtMoney(ex.used, ex.currency), lim = fmtMoney(ex.limit, ex.currency);
+    let line = used ? "已用 " + used : "";
+    if (used && lim) line += " / " + lim;
+    if (ex.spendLimitReached) line += (line ? " · " : "") + "额外用量也到上限了";
+    parts.line.textContent = line;
+    parts.line.classList.toggle("hidden", !line);
+  }
+  function renderBreakdown() {
+    const b = usage && usage.breakdown;
+    const rows = b && Array.isArray(b.rows)
+      ? b.rows.filter((r) => r && typeof r.pct === "number" && r.pct > 0).sort((a, c) => c.pct - a.pct).slice(0, 4) : [];
+    breakdownEl.classList.toggle("hidden", !rows.length);
+    if (rows.length) breakdownEl.textContent = "本周去向: " + rows.map((r) => r.label + " " + Math.round(r.pct) + "%").join(" · ");
+  }
   function refreshHud() {
     setBar(bar5, pct5, reset5, usage && usage.fiveHour);
     setBar(barw, pctw, resetw, usage && usage.week);
+    renderScoped(); renderExtra(); renderBreakdown();
     nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
     demoTag.classList.toggle("hidden", !demo);
 
@@ -233,8 +339,13 @@
       show(msgEl, "🚦 浏览器拦截了直连请求（CORS）。建议填「手动 %」，或在设置里配置中转地址。");
     } else if (errorCode === "fetch") {
       show(msgEl, "获取失败 — " + (errorDetail || "稍后再试") );
-    } else if (mode === "depleted" && usage && usage.fiveHour) {
-      show(msgEl, "额度用完啦 💤 " + (fmtCd(usage.fiveHour.resetsAt) || ""));
+    } else if (mode === "overage") {
+      show(msgEl, "计划额度已用完，正在消耗额外用量 💸");
+    } else if (mode === "depleted" && usage) {
+      const lock = lockedReason(usage);
+      const win = blockingWindow(usage);
+      if (lock) show(msgEl, "🔒 额度已锁定：" + lock);
+      else show(msgEl, "额度用完啦 💤 " + ((win && fmtCd(win.resetsAt)) || "") + (usage.extra && usage.extra.enabled ? " · 额外用量也到上限了" : ""));
     } else if (demo) {
       show(msgEl, "当前是演示数据。点 ⚙ 填入「手动 %」或 Token 看你的真实用量。");
     }
@@ -244,8 +355,8 @@
   let bubbleTimer = null;
   function refreshBubble() {
     clearTimeout(bubbleTimer);
-    if (mode === "depleted" || mode === "lost") {
-      bubble.textContent = mode === "lost" ? "?" : "Zzz…";
+    if (mode === "depleted" || mode === "lost" || mode === "overage") {
+      bubble.textContent = mode === "lost" ? "?" : mode === "overage" ? "💸" : "Zzz…";
       bubble.classList.remove("hidden");
       bubble.style.left = (petX + pet() / 2) + "px";
     } else {
@@ -351,28 +462,105 @@
     const pct = v > 0 && v < 1 ? v * 100 : v;
     return Math.max(0, Math.min(100, pct));
   }
+  // same normalizer as desktop/lib/usageClient.js (2026-10 payload: the
+  // structured limits[] list is preferred, legacy five_hour/seven_day keys
+  // are the fallback; extra_usage/spend and seven_day_breakdown are surfaced)
   function pickWindow(obj) {
     if (!obj || typeof obj !== "object") return null;
-    const pct = pctOf(obj.utilization ?? obj.used_percent ?? obj.percent);
+    let pct = typeof obj.percent === "number" && isFinite(obj.percent)
+      ? Math.max(0, Math.min(100, obj.percent)) : pctOf(obj.utilization ?? obj.used_percent);
+    if (pct === null && typeof obj.limit_dollars === "number" && obj.limit_dollars > 0 && typeof obj.used_dollars === "number") {
+      pct = Math.max(0, Math.min(100, (obj.used_dollars / obj.limit_dollars) * 100));
+    }
     let resetsAt = obj.resets_at ?? obj.resetsAt ?? obj.reset_at ?? null;
     if (typeof resetsAt === "number") {
       resetsAt = new Date(resetsAt < 1e12 ? resetsAt * 1000 : resetsAt).toISOString();
     }
+    if (typeof resetsAt !== "string" || !resetsAt.trim()) resetsAt = null;
     if (pct === null && !resetsAt) return null;
-    return { pct: pct ?? 0, resetsAt };
+    const w = { pct: pct ?? 0, resetsAt };
+    if (typeof obj.severity === "string") w.severity = obj.severity;
+    if (typeof obj.is_active === "boolean") w.isActive = obj.is_active;
+    if (obj.locked_reason != null && obj.locked_reason !== "") w.lockedReason = String(obj.locked_reason);
+    return w;
   }
+  function scopeLabel(scope) {
+    if (!scope || typeof scope !== "object") return null;
+    const m = scope.model, s = scope.surface;
+    if (m && typeof m === "object" && (m.display_name || m.id)) return String(m.display_name || m.id);
+    if (typeof m === "string" && m) return m;
+    if (s && typeof s === "object" && (s.display_name || s.id)) return String(s.display_name || s.id);
+    if (typeof s === "string" && s) return s;
+    return null;
+  }
+  const slug = (l) => String(l).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "scoped";
   function normalize(raw) {
-    const out = { fiveHour: null, week: null };
-    if (raw && typeof raw === "object") {
-      out.fiveHour = pickWindow(raw.five_hour ?? raw.fiveHour ?? raw.session);
-      out.week = pickWindow(raw.seven_day ?? raw.sevenDay ?? raw.weekly);
-      if (!out.fiveHour && !out.week) {
-        const nest = raw.usage || raw.limits || raw.data;
-        if (nest && typeof nest === "object" && !Array.isArray(nest)) {
-          out.fiveHour = pickWindow(nest.five_hour ?? nest.session);
-          out.week = pickWindow(nest.seven_day ?? nest.weekly);
+    const out = { fiveHour: null, week: null, fable: null, scoped: [], extra: null, breakdown: null };
+    if (!raw || typeof raw !== "object") return out;
+    if (Array.isArray(raw.limits)) {
+      const shares = Array.isArray(raw.weekly_scoped_shares) ? raw.weekly_scoped_shares : [];
+      raw.limits.forEach((item, idx) => {
+        const w = pickWindow(item);
+        if (!w) return;
+        const kind = String(item.kind || "").toLowerCase();
+        const group = String(item.group || "").toLowerCase();
+        const label = scopeLabel(item.scope);
+        if (kind === "session" || (!kind && group === "session")) { if (!out.fiveHour) out.fiveHour = w; return; }
+        if (kind === "weekly_scoped" || (label && group === "weekly")) {
+          const share = shares.find((s) => s && s.limit_index === idx) || null;
+          out.scoped.push({ ...w, key: slug(label || "scoped-" + idx), label: label || "Scoped",
+            sharePct: share && typeof share.allowance_percent_of_weekly === "number" ? share.allowance_percent_of_weekly : null });
+          return;
         }
+        if (kind === "weekly_all" || (!kind && group === "weekly") || /week|seven/.test(kind)) { if (!out.week) out.week = w; }
+      });
+    }
+    if (!out.fiveHour) out.fiveHour = pickWindow(raw.five_hour ?? raw.fiveHour ?? raw.session);
+    if (!out.week) out.week = pickWindow(raw.seven_day ?? raw.sevenDay ?? raw.weekly);
+    const opus = pickWindow(raw.seven_day_opus ?? null);
+    if (opus && !out.scoped.some((s) => /opus/i.test(s.label))) out.scoped.push({ ...opus, key: "opus", label: "Opus", sharePct: null });
+    if (!out.scoped.some((s) => FABLE_RE.test(s.label))) {
+      for (const k of Object.keys(raw)) {
+        if (FABLE_RE.test(k)) { const w = pickWindow(raw[k]); if (w) { out.scoped.push({ ...w, key: slug(k), label: "Fable", sharePct: null }); break; } }
       }
+    }
+    if (!out.fiveHour && !out.week) {
+      const nest = raw.usage || raw.data;
+      if (nest && typeof nest === "object" && !Array.isArray(nest)) {
+        out.fiveHour = pickWindow(nest.five_hour ?? nest.session);
+        out.week = pickWindow(nest.seven_day ?? nest.weekly);
+      }
+    }
+    out.fable = out.scoped.find((s) => FABLE_RE.test(s.label)) || null;
+    const ex = raw.extra_usage && typeof raw.extra_usage === "object" ? raw.extra_usage : null;
+    const sp = raw.spend && typeof raw.spend === "object" ? raw.spend : null;
+    if (ex || sp) {
+      const e = ex || {}, s = sp || {};
+      const decimals = Number.isInteger(e.decimal_places) ? e.decimal_places : (s.used && Number.isInteger(s.used.exponent) ? s.used.exponent : 2);
+      const money = (v) => {
+        if (v == null) return null;
+        if (typeof v === "object") { const m = v.amount_minor ?? v.amount; const exp = Number.isInteger(v.exponent) ? v.exponent : decimals; return typeof m === "number" && isFinite(m) ? m / Math.pow(10, exp) : null; }
+        return typeof v === "number" && isFinite(v) ? v / Math.pow(10, decimals) : null;
+      };
+      out.extra = {
+        enabled: typeof e.is_enabled === "boolean" ? e.is_enabled : !!s.enabled,
+        pct: pctOf(e.utilization ?? s.percent),
+        used: money(e.used_credits) ?? money(s.used),
+        limit: money(e.monthly_limit) ?? money(s.limit) ?? money(s.cap),
+        currency: (typeof e.currency === "string" && e.currency) || (s.used && s.used.currency) || null,
+        disabledReason: e.disabled_reason || s.disabled_reason || null,
+        spendLimitReached: !!e.spend_limit_reached,
+      };
+    }
+    const b = raw.seven_day_breakdown;
+    if (b && typeof b === "object" && Array.isArray(b.rows)) {
+      const rows = b.rows.map((r) => {
+        if (!r || typeof r !== "object") return null;
+        const label = String(r.display_name || r.key || "").trim();
+        const pct = typeof r.percent === "number" && isFinite(r.percent) ? Math.max(0, Math.min(100, r.percent)) : pctOf(r.utilization);
+        return label && pct !== null ? { key: String(r.key || slug(label)), label, pct } : null;
+      }).filter(Boolean);
+      if (rows.length) out.breakdown = { rows };
     }
     return out;
   }
@@ -395,14 +583,23 @@
     return normalize(await res.json());
   }
 
-  function manualUsage(m5, mw) {
-    const w = (v) => (v === null || v === "" ? null : { pct: Math.max(0, Math.min(100, +v)), resetsAt: null });
-    return { fiveHour: w(m5), week: w(mw) };
+  function manualUsage(m5, mw, mf) {
+    const w = (v) => (v === null || v === "" || !isFinite(+v) ? null : { pct: Math.max(0, Math.min(100, +v)), resetsAt: null });
+    const fable = w(mf);
+    return {
+      fiveHour: w(m5), week: w(mw),
+      scoped: fable ? [{ ...fable, key: "fable", label: "Fable", sharePct: null }] : [],
+      fable: fable ? { ...fable, key: "fable", label: "Fable", sharePct: null } : null,
+      extra: null, breakdown: null,
+    };
   }
   function demoUsage() {
+    const fable = { pct: 12, resetsAt: new Date(Date.now() + 3 * 86400e3).toISOString(), key: "fable", label: "Fable", sharePct: 50 };
     return {
       fiveHour: { pct: 32, resetsAt: new Date(Date.now() + 2 * 3600e3).toISOString() },
       week: { pct: 48, resetsAt: new Date(Date.now() + 4 * 86400e3).toISOString() },
+      scoped: [fable], fable, extra: null,
+      breakdown: { rows: [{ key: "claude_code", label: "Claude Code", pct: 79 }, { key: "cowork", label: "Cowork", pct: 19 }, { key: "chat", label: "Chats", pct: 2 }] },
     };
   }
 
@@ -416,6 +613,7 @@
     const proxy = (get(LS.proxy) || "").trim();
     const m5 = get(LS.five);
     const mw = get(LS.week);
+    const mf = get(LS.fable);
 
     if (token) {
       try {
@@ -432,8 +630,8 @@
       }
     }
 
-    if (m5 !== null || mw !== null) {
-      usage = manualUsage(m5, mw); demo = false;
+    if (m5 !== null || mw !== null || mf !== null) {
+      usage = manualUsage(m5, mw, mf); demo = false;
       if (!token) errorCode = null;
       applyState();
       setFoot("手动模式 · " + nowStr());
@@ -451,6 +649,7 @@
   const fProxy = document.getElementById("f-proxy");
   const fFive = document.getElementById("f-five");
   const fWeek = document.getElementById("f-week");
+  const fFable = document.getElementById("f-fable");
   const sStatus = document.getElementById("settings-status");
 
   function openSettings() {
@@ -458,6 +657,7 @@
     fProxy.value = get(LS.proxy) || "";
     fFive.value = get(LS.five) || "";
     fWeek.value = get(LS.week) || "";
+    fFable.value = get(LS.fable) || "";
     sStatus.textContent = "";
     overlay.classList.remove("hidden");
   }
@@ -471,11 +671,12 @@
     set(LS.proxy, fProxy.value.trim());
     set(LS.five, fFive.value.trim());
     set(LS.week, fWeek.value.trim());
+    set(LS.fable, fFable.value.trim());
     closeSettings();
     refresh();
   };
   document.getElementById("s-clear").onclick = () => {
-    fToken.value = fProxy.value = fFive.value = fWeek.value = "";
+    fToken.value = fProxy.value = fFive.value = fWeek.value = fFable.value = "";
     sStatus.textContent = "已清空（点保存生效）";
   };
   document.getElementById("s-test").onclick = async () => {
@@ -486,7 +687,9 @@
       const u = await fetchUsage(token, fProxy.value.trim());
       const f = u.fiveHour ? Math.round(u.fiveHour.pct) + "%" : "—";
       const w = u.week ? Math.round(u.week.pct) + "%" : "—";
-      sStatus.textContent = `✅ 成功！5h ${f} · 周 ${w}`;
+      const sc = (u.scoped || []).map((s) => ` · ${s.label} ${Math.round(s.pct)}%`).join("");
+      const ex = u.extra && u.extra.enabled ? ` · 额外用量${typeof u.extra.pct === "number" ? " " + Math.round(u.extra.pct) + "%" : " 已开启"}` : "";
+      sStatus.textContent = `✅ 成功！5h ${f} · 周 ${w}${sc}${ex}`;
     } catch (e) {
       if (e instanceof TypeError) sStatus.textContent = "❌ 被 CORS 拦截。需要配置中转地址（见 README），或改用手动 %。";
       else if (e && e.status === 401) sStatus.textContent = "❌ Token 无效或过期。";
@@ -511,6 +714,7 @@
     if (usage) {
       setBar(bar5, pct5, reset5, usage.fiveHour);
       setBar(barw, pctw, resetw, usage.week);
+      renderScoped(); renderExtra();
     }
   }, 1000);
   setInterval(() => { if ((get(LS.token) || "").trim()) refresh(); }, 5 * 60 * 1000);
@@ -521,7 +725,7 @@
   refresh();
   requestAnimationFrame(rafLoop);
   // first-load helper text
-  if (!(get(LS.token) || get(LS.five) || get(LS.week))) {
+  if (!(get(LS.token) || get(LS.five) || get(LS.week) || get(LS.fable))) {
     setFoot("点 ⚙ 设置你的用量来源");
   }
 

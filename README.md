@@ -1,7 +1,7 @@
 # Claude Pet 🐾
 
-> A floating 8-bit pixel pet that shows your **Claude usage** (5-hour & weekly limits) and changes its mood as you burn through your quota.
-> 一只悬浮的 8-bit 像素桌宠，实时显示你的 **Claude 用量**（5 小时 / 每周额度），并随着额度消耗切换心情。
+> A floating 8-bit pixel pet that shows your **Claude usage** (5-hour, weekly & model-scoped limits, plus extra usage) and changes its mood as you burn through your quota.
+> 一只悬浮的 8-bit 像素桌宠，实时显示你的 **Claude 用量**（5 小时 / 每周 / 模型专属额度，以及额外用量），并随着额度消耗切换心情。
 
 **English** · [中文](#中文教程)
 
@@ -17,13 +17,14 @@
 
 Claude Pet keeps a tiny pixel companion on your screen. It reads your local Claude Code credentials, polls Anthropic's usage endpoint, and turns the numbers into a mood:
 
-| Usage (worst of 5h / week) | Mood | Behaviour |
+| Usage (worst of 5h / week / model-scoped ✦) | Mood | Behaviour |
 | --- | --- | --- |
 | < 40% | 😺 happy | strolls & chats happily |
 | 40–70% | 🙂 calm | wanders lazily |
 | 70–90% | 😴 sleepy | slows down, warns you |
 | 90–99% | 😰 anxious | paces fast |
-| ≥ 99% | 💤 depleted | sleeps until reset |
+| plan limits dry, **usage credits** carrying the load | 💸 overage | keeps working, paces, nags about the bill |
+| ≥ 99% (or a locked window) | 💤 depleted | sleeps until reset |
 | no credentials | ❓ lost | confused |
 
 It comes in two flavours:
@@ -31,13 +32,13 @@ It comes in two flavours:
 - **Desktop** ([`desktop/`](desktop/)) — a transparent, always-on-top, click-through floating pet for **macOS & Windows** (Electron).
 - **Mobile / Web** ([`web/`](web/)) — the same pets as an installable **PWA** for your phone.
 
-### Desktop — quick start (needs [Node.js](https://nodejs.org))
+### Desktop — quick start (needs [Node.js](https://nodejs.org) 22+; macOS 13+ or Windows 10/11 x64)
 
 **macOS**
 ```bash
 cd desktop
-npm install     # first time only, downloads Electron (~1–2 min)
-npm start
+npm install     # first time only
+npm start       # the first launch downloads the Electron binary (~1–2 min)
 ```
 Next time just double-click `desktop/启动桌宠.command`.
 
@@ -58,9 +59,15 @@ npm start
 - ◀ ▶ in the panel cycles through all pets
 - Pets now really **walk** (4-frame gait) and occasionally stop to **yawn** 🥱 or **stretch** — sleepier pets yawn more
 
-### Fable ✦ usage, separately tracked
+### Model-scoped limits (Fable ✦), usage credits 💸 and where your week went
 
-If your subscription includes **Fable / Mythos-tier** models, the usage panel grows a dedicated violet **F✦ bar**, the tray tooltip shows it, and the pet sends its own notifications when Fable crosses **80% / 95%** (and celebrates when it resets). The priciest window also feeds the pet's mood.
+Claude's usage API (as of Oct 2026) reports a structured list of limits instead of two plain numbers, and the pet reads all of it:
+
+- **5h / weekly** — the session window and the weekly all-models window (the one currently binding is what `claude`'s `/usage` lists first).
+- **Model-scoped weekly windows** — e.g. the **Fable ✦** weekly limit on Max / Team Premium plans (Fable 5.1 and Mythos 5.1 share it; it's a share of the weekly allowance — hover the label to see the share). Each scoped window gets its own bar — violet for Fable, teal for anything else — labelled straight from the API, so a newly scoped model shows up without an app update. Fable keeps its dedicated **80% / 95%** notifications and reset celebration, and the tray tooltip lists every window.
+- **Usage credits 💸** (the API calls them "extra usage") — if you've enabled them, a gold bar shows how much of your monthly spend limit you've burned (plus the amount). When the plan limits are dry but credits are carrying the load ("Now using credits" in Claude Code), the pet doesn't fall asleep: it enters the **overage** mood, paces, nags about the bill, and notifies you at **80% / 95%** of the spend limit.
+- **This week** — a one-liner of where the weekly usage went (Claude Code / Chats / Cowork / Other).
+- **Locks** — if a window is locked (e.g. by an org policy) the HUD says so instead of showing a misleading countdown.
 
 ### Track OTHER agents too (Codex / OpenClaw 🦞 / anything)
 
@@ -83,6 +90,8 @@ Custom JSON format (a single object, or an array for several agents at once):
 
 **Settings → Pixel buddy**: pick a photo of a family member, friend, partner or your real cat/dog, and Claude Pet pixelates them into a 16×16 companion — with breathing, walking and sleeping animations — so they keep you company while you work. Everything happens locally; the photo never leaves your machine (only the tiny 16×16 pixel grid is stored). Up to 8 buddies, deletable anytime from the character grid.
 
+> **Boss key on Apple Silicon:** the global triple-Esc hook needs a native helper; `npm install` rebuilds it with `swiftc` when the Xcode Command Line Tools are present (`xcode-select --install`, then `npm install` again). Without them only ⌘⇧B works.
+
 ### Build standalone installers (optional)
 ```bash
 cd desktop
@@ -103,7 +112,7 @@ On your phone (same Wi-Fi) open `http://<your-computer-ip>:8099`, then:
 - **Android (Chrome)**: menu → *Add to Home Screen*
 
 **Where does the phone get data?** (tap ⚙) Phones have no local Claude credentials, and browsers usually get **CORS-blocked** calling Anthropic directly, so there are three options:
-1. **Manual %** *(most reliable)* — read your current 5h / weekly % from `claude`'s `/usage` and type them in.
+1. **Manual %** *(most reliable)* — read your current 5h / weekly % (and optionally the Fable ✦ %) from `claude`'s `/usage` and type them in.
 2. **Proxy URL** — point it at a small relay (e.g. a Cloudflare Worker) that forwards the request and adds CORS headers, then it fetches live data.
 3. **Token directly** — paste an OAuth token and try; falls back gracefully if CORS blocks it.
 
@@ -115,11 +124,14 @@ See [`web/README.md`](web/README.md) for the proxy details. Your token stays in 
   - macOS: Keychain (`Claude Code-credentials`) → falls back to `~/.claude/.credentials.json`
   - Windows: `%USERPROFILE%\.claude\.credentials.json`
 - Calls the **unofficial** `https://api.anthropic.com/api/oauth/usage` endpoint — the same data `claude`'s `/usage` shows. It may change without notice.
+- Reads these fields (verified against Claude Code 2.1.280 on 2026-10-22): the structured `limits[]` list (`session` / `weekly_all` / `weekly_scoped` + the model name), `weekly_scoped_shares`, `extra_usage` + `spend` (usage credits), `seven_day_breakdown`, and the legacy `five_hour` / `seven_day` / `seven_day_opus` keys as a fallback. The obfuscated experiment keys are ignored. The parser ships with a captured payload and `npm test` covers it.
 - Polls every 5 minutes with exponential backoff on rate limits. **Nothing leaves your machine** except the usage request to Anthropic.
 
 > ⚠️ Unofficial endpoint — use at your own discretion. This project never refreshes or writes your tokens.
 
 ### Develop / add a new character
+
+`cd desktop && npm test` runs the usage-parser and mood tests (plain `node --test`, no extra dependencies). To work on the HUD without credentials or network, replay a captured payload: `CLAUDE_PET_FIXTURE=test/fixtures/usage-2026-10.json npm start` (the live endpoint rate-limits after a few quick requests, so don't relaunch against it in a loop). `CLAUDE_PET_SMOKE=1` prints what the HUD rendered 15 s after boot.
 
 Pixel art is generated by one script and written to **both** the desktop renderer and the web app, so they always match:
 
@@ -140,13 +152,14 @@ MIT
 
 Claude Pet 在你屏幕上养一只像素小宠物。它只读本机的 Claude Code 凭证，轮询 Anthropic 的用量端点，把数字变成宠物的心情：
 
-| 用量（5h / 周 取较高者） | 心情 | 表现 |
+| 用量（5h / 周 / 模型专属 ✦ 取最高者） | 心情 | 表现 |
 | --- | --- | --- |
 | < 40% | 😺 开心 | 开心地散步、说话 |
 | 40–70% | 🙂 悠哉 | 慢悠悠溜达 |
 | 70–90% | 😴 犯困 | 变慢，提醒你省着点 |
 | 90–99% | 😰 焦虑 | 来回快走 |
-| ≥ 99% | 💤 力竭 | 睡到额度重置 |
+| 计划额度用光、靠**额外用量**顶着 | 💸 烧钱 | 继续干活，来回踱步、碎碎念账单 |
+| ≥ 99%（或额度被锁定） | 💤 力竭 | 睡到额度重置 |
 | 无凭证 | ❓ 迷路 | 一脸问号 |
 
 提供两种形态：
@@ -154,13 +167,13 @@ Claude Pet 在你屏幕上养一只像素小宠物。它只读本机的 Claude C
 - **桌面版** ([`desktop/`](desktop/)) —— 透明、置顶、点击穿透的悬浮桌宠，支持 **macOS 和 Windows**（Electron）。
 - **手机 / 网页版** ([`web/`](web/)) —— 同款宠物做成可装进手机主屏幕的 **PWA**。
 
-### 桌面版 —— 快速开始（需要 [Node.js](https://nodejs.org)）
+### 桌面版 —— 快速开始（需要 [Node.js](https://nodejs.org) 22+；macOS 13+ 或 Windows 10/11 x64）
 
 **macOS**
 ```bash
 cd desktop
-npm install     # 第一次需要，下载 Electron，约 1–2 分钟
-npm start
+npm install     # 第一次需要
+npm start       # 第一次启动会下载 Electron 本体，约 1–2 分钟
 ```
 以后双击 `desktop/启动桌宠.command` 即可。
 
@@ -181,9 +194,15 @@ npm start
 - 面板里 ◀ ▶ 循环切换全部宠物
 - 宠物现在会**真正走路**（4 帧步态），还会时不时停下来**打哈欠** 🥱、**伸懒腰**——越困的宠物哈欠越多
 
-### Fable ✦ 用量单独提醒
+### 模型专属额度（Fable ✦）、额外用量 💸 和本周去向
 
-如果你的订阅包含 **Fable / Mythos 级**模型，用量面板会多出一条专属的紫色 **F✦ 进度条**，托盘悬浮提示也会显示；Fable 用量冲过 **80% / 95%** 时会单独弹系统通知提醒你（重置时也会庆祝）。这条最贵的额度同样会影响宠物心情。
+Claude 的用量接口（2026 年 10 月起）返回的是一张结构化的额度列表，而不只是两个百分比，桌宠把它们全读进来：
+
+- **5h / 周** —— 会话窗口 + 全模型周窗口（当前真正卡住你的那条，就是 `claude` 的 `/usage` 排在最前面的那条）。
+- **模型专属周额度** —— 比如 Max / Team Premium 计划的 **Fable ✦** 周额度（Fable 5.1 和 Mythos 5.1 共用；它是周额度的一部分，鼠标悬停标签能看到占比）。每条专属额度一根进度条：Fable 紫色、其他青色，标签直接取自接口，以后新增的专属模型不用更新 App 也会出现。Fable 依旧有专属的 **80% / 95%** 通知和重置庆祝，托盘悬浮提示会列出每一条额度。
+- **额外用量 💸**（官方叫「用量积分 / usage credits」，接口字段是 `extra_usage`）—— 开了的话，会多一根金色进度条显示月消费上限用了多少（和金额）。计划额度烧光但积分还在顶着时（Claude Code 里显示 "Now using credits"），宠物不会睡觉，而是进入 **烧钱** 心情：来回踱步、碎碎念账单，并在用到上限的 **80% / 95%** 时弹通知。
+- **本周去向** —— 一行小字告诉你这周的额度花在了哪（Claude Code / 对话 / Cowork / 其他）。
+- **锁定** —— 某条额度被锁定（比如组织策略）时，面板会直接说明，而不是显示一个误导的倒计时。
 
 ### 也能追踪其他 Agent 的用量（Codex / OpenClaw 龙虾 🦞 / 任意工具）
 
@@ -206,6 +225,8 @@ npm start
 
 **设置 → 像素伙伴**：选一张家人、朋友、恋人或自家猫狗的照片，Claude Pet 会把 TA 像素化成 16×16 的小人 —— 会呼吸、会走路、会躺下睡觉，工作时一直陪着你。全程本地处理，照片不会离开你的电脑（只保存那张小小的 16×16 像素网格）。最多 8 个伙伴，随时可以在形象网格里删除。
 
+> **Apple Silicon 上的老板键：** 全局三连 Esc 需要一个原生小助手，`npm install` 时会用 `swiftc` 自动编译（需要 Xcode Command Line Tools：`xcode-select --install`，装完再跑一次 `npm install`）；没有的话只有 ⌘⇧B 可用。
+
 ### 打包成独立安装包（可选）
 ```bash
 cd desktop
@@ -226,7 +247,7 @@ python3 -m http.server 8099      # 或：npx serve .
 - **Android（Chrome）**：菜单 →「添加到主屏幕」
 
 **手机怎么拿数据？**（点 ⚙）手机上没有本机 Claude 凭证，而且浏览器直连 Anthropic 接口通常会被 **CORS 拦截**，所以有三档：
-1. **手动 %**（最稳，推荐）—— 在电脑用 `claude` 的 `/usage` 看一眼当前 5h / 周百分比填进去。
+1. **手动 %**（最稳，推荐）—— 在电脑用 `claude` 的 `/usage` 看一眼当前 5h / 周百分比（Fable ✦ 可选）填进去。
 2. **中转地址** —— 填一个能转发请求并补 CORS 头的小中转（比如 Cloudflare Worker），就能自动拉实时数据。
 3. **直接填 Token** —— 粘贴 OAuth token 试试，被 CORS 拦会自动回退。
 
@@ -238,11 +259,14 @@ python3 -m http.server 8099      # 或：npx serve .
   - macOS：钥匙串（`Claude Code-credentials`）→ 回退到 `~/.claude/.credentials.json`
   - Windows：`%USERPROFILE%\.claude\.credentials.json`
 - 调用**非官方**端点 `https://api.anthropic.com/api/oauth/usage` —— 和 `claude` 的 `/usage` 同源，可能随时变动。
+- 读取的字段（2026-10-22 对照 Claude Code 2.1.280 验证）：结构化的 `limits[]` 列表（`session` / `weekly_all` / `weekly_scoped` + 模型名）、`weekly_scoped_shares`、`extra_usage` + `spend`（用量积分）、`seven_day_breakdown`，以及老的 `five_hour` / `seven_day` / `seven_day_opus` 作为回退。那些乱码实验字段一概忽略。解析器附带一份抓包样本，`npm test` 会跑。
 - 每 5 分钟轮询一次，被限流会指数退避重试。除了向 Anthropic 发的那一个用量请求，**没有任何数据离开你的电脑**。
 
 > ⚠️ 非官方端点，自行斟酌使用。本项目从不刷新、也不写入你的 token。
 
 ### 二次开发 / 加新形象
+
+`cd desktop && npm test` 跑用量解析和心情逻辑的测试（原生 `node --test`，不需要额外依赖）。改 HUD 时可以不登录、不联网地回放一份抓包：`CLAUDE_PET_FIXTURE=test/fixtures/usage-2026-10.json npm start`（线上端点连续请求几次就会限流，别反复对着它重启）。`CLAUDE_PET_SMOKE=1` 会在启动 15 秒后打印 HUD 实际渲染的文字。
 
 像素素材由一个脚本生成，同时写到桌面版和网页版，两边永远一致：
 

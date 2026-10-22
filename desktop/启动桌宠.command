@@ -9,8 +9,15 @@ if pgrep -f "electron .*claude-pet/desktop" >/dev/null 2>&1; then
 fi
 
 if [ ! -d node_modules ]; then
-  echo "第一次启动，正在安装依赖（约 1-2 分钟）…"
+  echo "第一次启动，正在安装依赖…"
   npm install || { echo "npm install 失败，请确认已安装 Node.js"; read -n 1; exit 1; }
+fi
+
+# Electron ≥42 不再在 npm install 时下载本体，而是第一次运行时下载——
+# 在这里显式、可见地下载，免得下面的后台启动静默地卡一两分钟
+if [ ! -d node_modules/electron/dist ]; then
+  echo "正在下载 Electron 本体（约 1-2 分钟，只需一次）…"
+  npx install-electron || { echo "下载 Electron 失败，请检查网络后重试"; read -n 1; exit 1; }
 fi
 
 # 后台分离启动：本窗口可以直接关掉，宠物继续运行
