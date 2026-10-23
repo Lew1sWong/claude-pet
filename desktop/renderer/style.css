@@ -188,3 +188,23 @@ html, body {
   to   { box-shadow: 0 0 0 2px #f28c28; }
 }
 .garden-hint { margin-top: 3px; text-align: center; color: #9a9ab0; font-size: 10px; }
+
+/* ---------------- 0.4.0: ⛈ weather overlay · 📋 report card · 🐦‍⬛ crow ---------------- */
+.wx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; z-index: 3; }
+.report-card { margin: 2px 0 6px; padding: 6px 8px; border: 1px solid #8e7cc3; background: rgba(60, 50, 90, .35); }
+.rc-title { font-weight: bold; margin-bottom: 4px; }
+.rc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.rc-grade { width: 30px; height: 30px; flex: 0 0 30px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; border: 2px solid #9a9ab0; color: #9a9ab0; }
+.rc-grade.g-S { color: #f5d142; border-color: #f5d142; box-shadow: 0 0 8px rgba(245, 209, 66, .5); }
+.rc-grade.g-A { color: #6cc887; border-color: #6cc887; }
+.rc-grade.g-B { color: #e6b455; border-color: #e6b455; }
+.rc-grade.g-C { color: #d9634f; border-color: #d9634f; }
+.rc-name { font-weight: bold; }
+.rc-sub, .rc-row, .rc-last { font-size: 10px; color: #c8c8d8; margin-top: 2px; line-height: 1.35; }
+.rc-tip { font-size: 10px; color: #f0d890; margin-top: 3px; line-height: 1.35; }
+.rc-last { color: #9a9ab0; margin-top: 4px; }
+.plot.crow { animation: crow-shake .5s steps(2) infinite; box-shadow: 0 0 0 1px #d9634f; }
+@keyframes crow-shake { from { transform: translateX(-1px); } to { transform: translateX(1px); } }
+
+/* 📋 report mode: only the title row and the card stay visible */
+#hud.report-mode > :not(#title-row):not(#report-card):not(.wx) { display: none !important; }

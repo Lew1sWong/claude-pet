@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.4.0 — 2026-10-24 · "乌鸦、天气和成绩单"
+
+### 🐦‍⬛ The crow
+- Leave a ripe crop unharvested for 8 h and a crow lands on it (animated,
+  the plot shakes, a notification + caw). Ignore it for 4 more hours and it
+  flies off with the crop. Click the crow to shoo it (new 🐦‍⬛ *Scarecrow*
+  medal at 10 shoos). Losses and shoos show up on the weekly report card.
+
+### ⛈ Live quota weather
+- The forecast now has visuals: pixel rain over the HUD when the window is
+  going to run dry before the reset, heavier rain + lightning flashes (and
+  thunder, if sounds are on) when it's running dry fast, floating sparkles
+  when you're fine.
+- **Pace alarm**: one notification per window instance when the forecast
+  turns bad ("⛈ 照这速度 5h 额度 1 小时 12 分 后见底，离重置还有 3 小时").
+
+### 📋 Weekly report card + titles
+- 📋 button in the HUD opens the card: grade S/A/B/C (score from
+  depletions, close calls, late-night share, evenness, crow losses), a
+  playful title — 烧 token 狂魔 / 夜猫子 / 周末战士 / 佛系用户 / 周一冲刺手 /
+  节奏大师 / 种田能手 / 稳健开发者 — heaviest day, late-night share, garden
+  stats and up to two tips. At the weekly reset the finished week is graded,
+  pushed as a notification and the card pops open.
+
+### 🔊 8-bit sounds (off by default)
+- WebAudio-synthesized blips, no asset files: plant, harvest, shoo, crow,
+  reset jingle, warning, thunder, achievement. Settings → Features → Sound.
+
+### 🗣 Context-aware quips
+- The pet now comments on late-night sessions, Mondays, Fridays, weekends,
+  Fable-heavy weeks, Cowork-heavy or Claude-Code-only weeks (zh/en).
+
 ## 0.3.0 — 2026-10-23 · "菜园与天气预报"
 
 ### 🌱 Pixel garden (desktop)

@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld("petAPI", {
   onGarden: (cb) => ipcRenderer.on("garden", (_e, g) => cb(g)),
   gardenPlant: (i, crop) => ipcRenderer.send("garden-plant", i, crop),
   gardenHarvest: (i) => ipcRenderer.send("garden-harvest", i),
+  gardenShoo: (i) => ipcRenderer.send("garden-shoo", i),
+  onSfx: (cb) => ipcRenderer.on("sfx", (_e, n) => cb(n)),
   dragStart: (offX, offY) => ipcRenderer.send("drag-start", offX, offY),
   dragEnd: () => ipcRenderer.send("drag-end"),
   setIgnore: (v) => ipcRenderer.send("set-ignore", v),

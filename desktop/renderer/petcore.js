@@ -432,16 +432,110 @@
       paintFrame(ctx, frame, G.palette);
       const thirsty = !!(p && p.wilt >= 0.5 && st < 3);
       if (thirsty) { ctx.fillStyle = "#5aa7ff"; ctx.fillRect(13, 1, 2, 2); ctx.fillRect(14, 0, 1, 1); }
-      c.classList.toggle("ripe", st === 3);
+      const crow = !!(p && p.crow);
+      if (crow && G.crow) {
+        // 🐦‍⬛ flap every ~600 ms; the caller re-renders each second while a crow is around
+        const cf = G.crow[Math.floor(Date.now() / 600) % G.crow.length];
+        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+          const ch = cf[y][x];
+          if (ch !== ".") { ctx.fillStyle = G.palette[ch]; ctx.fillRect(x, y, 1, 1); }
+        }
+      }
+      c.classList.toggle("ripe", st === 3 && !crow);
+      c.classList.toggle("crow", crow);
       c.classList.toggle("thirsty", thirsty);
       c.classList.toggle("empty", !p);
       const crop = p ? tt("crop." + p.crop) : "";
       c.title = !p ? tt("garden.plant")
-        : st === 3 ? tt("garden.ripe").replace("{crop}", crop)
-          : thirsty ? tt("garden.thirsty").replace("{crop}", crop)
-            : tt("garden.growing").replace("{crop}", crop).replace("{pct}", String(Math.round(p.progress * 100)));
+        : crow ? tt("garden.crow").replace("{crop}", crop)
+          : st === 3 ? tt("garden.ripe").replace("{crop}", crop)
+            : thirsty ? tt("garden.thirsty").replace("{crop}", crop)
+              : tt("garden.growing").replace("{crop}", crop).replace("{pct}", String(Math.round(p.progress * 100)));
     });
     container._hint.textContent = tt("garden.hint") + (garden.harvested ? ` · 🧺 ${garden.harvested}` : "");
+  }
+
+  // ---- ⛈ live quota weather: pixel rain / lightning / sunny sparkles on an
+  // overlay canvas (1 canvas px = 2 css px for that chunky look) ----
+  const FX = { canvas: null, weather: "unknown", raf: 0, drops: [], sparks: [], flashUntil: 0, nextFlash: 0, onThunder: null };
+  function setWeatherFx(canvas, weather, onThunder) {
+    if (!canvas) return;
+    FX.canvas = canvas;
+    FX.onThunder = onThunder || null;
+    const w = weather || "unknown";
+    if (FX.weather !== w) { FX.weather = w; FX.drops = []; FX.sparks = []; FX.flashUntil = 0; FX.nextFlash = 0; }
+    const active = w === "rain" || w === "storm" || w === "sunny";
+    canvas.classList.toggle("hidden", !active);
+    if (active && !FX.raf) FX.raf = requestAnimationFrame(fxTick);
+  }
+  function fxTick(t) {
+    const c = FX.canvas;
+    const active = FX.weather === "rain" || FX.weather === "storm" || FX.weather === "sunny";
+    if (!c || !active) { FX.raf = 0; return; }
+    const cw = c.clientWidth, ch = c.clientHeight;
+    if (!cw || !ch) { FX.raf = 0; setTimeout(() => { if (!FX.raf) FX.raf = requestAnimationFrame(fxTick); }, 600); return; } // hidden HUD: idle
+    const w = Math.max(1, Math.floor(cw / 2)), h = Math.max(1, Math.floor(ch / 2));
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    const ctx = c.getContext("2d");
+    ctx.clearRect(0, 0, w, h);
+    if (FX.weather === "sunny") {
+      if (FX.sparks.length < 6 && Math.random() < 0.08) FX.sparks.push({ x: Math.random() * w, y: h * (0.3 + Math.random() * 0.7), life: 1 });
+      FX.sparks = FX.sparks.filter((s) => s.life > 0);
+      for (const s of FX.sparks) {
+        s.y -= 0.15; s.life -= 0.012;
+        ctx.fillStyle = `rgba(245, 209, 66, ${Math.max(0, s.life).toFixed(2)})`;
+        ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1);
+        if (s.life > 0.5) { ctx.fillRect(Math.round(s.x) - 1, Math.round(s.y), 1, 1); ctx.fillRect(Math.round(s.x) + 1, Math.round(s.y), 1, 1); ctx.fillRect(Math.round(s.x), Math.round(s.y) - 1, 1, 1); ctx.fillRect(Math.round(s.x), Math.round(s.y) + 1, 1, 1); }
+      }
+    } else {
+      const storm = FX.weather === "storm";
+      const want = storm ? Math.floor(w / 4) : Math.floor(w / 9);
+      while (FX.drops.length < want) FX.drops.push({ x: Math.random() * w, y: Math.random() * h, v: 2 + Math.random() * (storm ? 2.5 : 1.2) });
+      ctx.fillStyle = storm ? "rgba(150, 190, 255, .75)" : "rgba(130, 170, 230, .55)";
+      for (const d of FX.drops) {
+        d.y += d.v; d.x -= storm ? 0.6 : 0.25;
+        if (d.y > h) { d.y = -2; d.x = Math.random() * w; }
+        if (d.x < 0) d.x = w;
+        ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, 2);
+      }
+      if (storm) {
+        if (!FX.nextFlash) FX.nextFlash = t + 2500 + Math.random() * 5000;
+        if (t >= FX.nextFlash) {
+          FX.flashUntil = t + 140; FX.nextFlash = t + 4000 + Math.random() * 7000;
+          if (FX.onThunder) { try { FX.onThunder(); } catch { /* ignore */ } }
+        }
+        if (t < FX.flashUntil) {
+          ctx.fillStyle = "rgba(255, 255, 255, .28)"; ctx.fillRect(0, 0, w, h);
+          ctx.fillStyle = "#fff8c0";
+          let x = Math.floor(w * (0.3 + Math.random() * 0.4)), y = 0;
+          while (y < h) { ctx.fillRect(x, y, 1, 3); y += 3; x += Math.random() < 0.5 ? -1 : 1; }
+        }
+      }
+    }
+    FX.raf = requestAnimationFrame(fxTick);
+  }
+
+  // ---- 📋 weekly report card ----
+  function renderReport(container, report, lastReport) {
+    if (!container) return;
+    container.textContent = "";
+    const el = (cls, text, parent) => { const d = document.createElement("div"); d.className = cls; if (text != null) d.textContent = text; (parent || container).appendChild(d); return d; };
+    el("rc-title", tt("report.title"));
+    if (!report || !report.grade) { el("rc-row", tt("report.empty")); return; }
+    const head = el("rc-head");
+    const g = document.createElement("span"); g.className = "rc-grade g-" + report.grade; g.textContent = report.grade; head.appendChild(g);
+    const txt = document.createElement("div");
+    el("rc-name", tt("title." + report.title), txt);
+    el("rc-sub", report.usedPct !== null ? tt("report.used").replace("{pct}", String(Math.round(report.usedPct))) : "", txt);
+    head.appendChild(txt);
+    el("rc-row", tt("report.depletions").replace("{n}", String(report.depletions)).replace("{m}", String(report.nearMisses)));
+    const bits = [];
+    if (report.peakDay !== null) bits.push(tt("report.peak").replace("{day}", tt("day." + report.peakDay)));
+    bits.push(tt("report.late").replace("{pct}", String(Math.round(report.lateNightShare * 100))));
+    el("rc-row", bits.join(" · "));
+    el("rc-row", tt("report.garden").replace("{h}", String(report.harvested)).replace("{l}", String(report.lost)).replace("{s}", String(report.shooed)));
+    (report.tips || []).forEach((k) => el("rc-tip", "💡 " + tt("tip." + k)));
+    if (lastReport && lastReport.grade) el("rc-last", tt("report.last").replace("{grade}", lastReport.grade).replace("{title}", tt("title." + lastReport.title)));
   }
 
   window.PetCore = {
@@ -450,5 +544,6 @@
     drawPet, frameCount, mergeCustomPets,
     renderOthers, renderScoped, renderExtra, renderBreakdown,
     drawSparkline, renderTrend, renderGarden, stageOfPlot,
+    setWeatherFx, renderReport,
   };
 })();

@@ -8,6 +8,7 @@
 <body>
   <!-- the black "Dynamic Island" capsule, hugging the top-center notch -->
   <div id="island" class="collapsed">
+    <canvas id="wx" class="wx hidden"></canvas>
     <!-- always-visible top strip; flanks the physical notch (center gap) -->
     <div class="notch-row">
       <div class="flank left">
@@ -27,9 +28,11 @@
         <button id="next" class="ibtn" data-i18n-title="tip.next" title="下一只">▶</button>
         <button id="game" class="ibtn" data-i18n-title="tip.game" title="玩游戏">🎮</button>
         <button id="feed" class="ibtn" data-i18n-title="tip.feed" title="投喂">🍖</button>
+        <button id="report" class="ibtn" data-i18n-title="tip.report" title="本周成绩单">📋</button>
         <button id="refresh" class="ibtn" data-i18n-title="tip.refresh" title="立即刷新">↻</button>
         <button id="menu" class="ibtn" data-i18n-title="tip.menu" title="菜单">🐾</button>
       </div>
+      <div id="report-card" class="report-card hidden"></div>
       <div class="bar-row"><span class="bar-label">5H</span>
         <div class="bar"><div id="bar5" class="bar-fill"></div></div>
         <span id="pct5" class="bar-pct">--%</span></div>
@@ -53,6 +56,7 @@
   <script src="gardensprites.js"></script>
   <script src="petcore.js"></script>
   <script src="i18n.js"></script>
+  <script src="sfx.js"></script>
   <script src="games.js"></script>
   <script src="island.js"></script>
 </body>

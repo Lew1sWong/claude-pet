@@ -9,6 +9,7 @@ const { readCredentials } = require("./lib/credentials");
 const { fetchUsage, normalize, pickClaude, isOverage, computeMood } = require("./lib/usageClient");
 const { pushSample, trendOf } = require("./lib/history");
 const G = require("./lib/garden");
+const { computeReport } = require("./lib/report");
 const { collectOthers } = require("./lib/providers");
 const { createBossController, DEFAULT_DISGUISES } = require("./lib/bossKey");
 const { readNotch } = require("./lib/notch");
@@ -122,7 +123,53 @@ function broadcastI18n() {
 // default: usage tracking + garden ON, games + boss OFF (chosen at onboarding)
 function featureFlags() {
   const f = settings.features || {};
-  return { usage: f.usage !== false, games: !!f.games, boss: !!f.boss, garden: f.garden !== false };
+  return { usage: f.usage !== false, games: !!f.games, boss: !!f.boss, garden: f.garden !== false, sound: !!f.sound };
+}
+
+// "1 天 3 小时" / "1 d 3 h" for notifications
+function fmtDur(ms) {
+  if (typeof ms !== "number" || !isFinite(ms) || ms < 0) return "?";
+  const h = Math.floor(ms / 3600e3), m = Math.floor((ms % 3600e3) / 60e3);
+  if (h >= 24) return `${Math.floor(h / 24)} ${tr("cd.day")} ${h % 24} ${tr("cd.hour")}`;
+  if (h > 0) return `${h} ${tr("cd.hour")} ${m} ${tr("cd.min")}`;
+  return `${Math.max(1, m)} ${tr("cd.minute")}`;
+}
+
+// 📋 this week's report card (garden counters are relative to the snapshot
+// taken at the last weekly reset)
+function weekGardenOpts() {
+  const snap = settings.weekGarden || null;
+  const g = garden || G.newGarden();
+  if (!snap) settings.weekGarden = { harvested: g.harvested, lost: g.lost, shooed: g.shooed };
+  const s = settings.weekGarden;
+  return {
+    harvested: Math.max(0, g.harvested - s.harvested),
+    lost: Math.max(0, g.lost - s.lost),
+    shooed: Math.max(0, g.shooed - s.shooed),
+    breakdown: lastUsage && lastUsage.breakdown ? lastUsage.breakdown.rows : null,
+  };
+}
+function reportPayload(samples) {
+  return computeReport(samples || settings.history, weekGardenOpts(), Date.now());
+}
+
+// ⛈ pace alarm: once per window instance when the forecast says the window
+// runs dry before its reset (5h: only "storm"; weekly: "rain" or "storm")
+function checkPaceAlarms(u, trend) {
+  if (!u || !trend) return;
+  const al = settings.paceAlarm || (settings.paceAlarm = {});
+  for (const key of ["f", "w"]) {
+    const o = key === "f" ? trend.five : trend.week;
+    const win = key === "f" ? u.fiveHour : u.week;
+    const id = win && win.resetsAt ? String(win.resetsAt) : null;
+    if (!o || !id) continue;
+    const bad = key === "f" ? o.weather === "storm" : (o.weather === "storm" || o.weather === "rain");
+    if (bad && al[key] !== id) {
+      al[key] = id;
+      notify(tr(`trend.alarm.${key}`).replace("{eta}", fmtDur(o.etaMs)).replace("{reset}", fmtDur(o.resetMs)));
+      sendToWin("sfx", "warn");
+    }
+  }
 }
 
 // ---- 🌱 garden: grows at the pace of the current mood, persisted in settings ----
@@ -134,6 +181,20 @@ function gardenTick(send) {
   const before = JSON.stringify(garden.plots);
   G.tick(garden, computeMood(lastUsage), Date.now());
   settings.garden = garden;
+  // 🐦‍⬛ a crow landed → one toast per visit; a crop got eaten → one toast per loss
+  const ci = G.crowAt(garden);
+  if (ci >= 0) {
+    const since = garden.plots[ci].crow.since;
+    if (settings.crowNotified !== since) {
+      settings.crowNotified = since;
+      notify(tr("crow.notify").replace("{crop}", tr("crop." + garden.plots[ci].crop)));
+      sendToWin("sfx", "crow");
+    }
+  }
+  if (garden.lastLoss && settings.lossNotified !== garden.lastLoss.at) {
+    settings.lossNotified = garden.lastLoss.at;
+    notify(tr("crow.lost").replace("{crop}", tr("crop." + garden.lastLoss.crop)));
+  }
   if (send && JSON.stringify(garden.plots) !== before) sendToWin("garden", gardenPayload());
 }
 function saveGarden() {
@@ -143,7 +204,12 @@ function saveGarden() {
 }
 // usage + the trend computed from the persisted history, as the renderer expects it
 function usagePayload(u) {
-  return { ...u, trend: trendOf(settings.history, u, Date.now()) };
+  return {
+    ...u,
+    trend: trendOf(settings.history, u, Date.now()),
+    report: reportPayload(),
+    lastReport: settings.lastReport || null,
+  };
 }
 
 // which usage sources to poll: Claude on by default; Codex / OpenClaw(龙虾) /
@@ -204,10 +270,10 @@ function sanitizeCustomPets(list) {
 const ACH_GOAL = 10;
 function statsNow() {
   const s = settings.stats || {};
-  return { bossUses: s.bossUses || 0, gameClears: s.gameClears || 0, harvests: s.harvests || 0 };
+  return { bossUses: s.bossUses || 0, gameClears: s.gameClears || 0, harvests: s.harvests || 0, shoos: s.shoos || 0 };
 }
 function bumpStat(kind) {
-  const map = { boss: "bossUses", game: "gameClears", harvest: "harvests" };
+  const map = { boss: "bossUses", game: "gameClears", harvest: "harvests", crow: "shoos" };
   const k = map[kind];
   if (!k) return;
   const st = statsNow();
@@ -217,7 +283,8 @@ function bumpStat(kind) {
   saveSettings();
   if (before < ACH_GOAL && st[k] >= ACH_GOAL) {
     // newly unlocked → toast + the pet celebrates
-    const title = tr(kind === "boss" ? "ach.boss.title" : kind === "harvest" ? "ach.harvest.title" : "ach.game.title");
+    const title = tr({ boss: "ach.boss.title", harvest: "ach.harvest.title", crow: "ach.crow.title" }[kind] || "ach.game.title");
+    sendToWin("sfx", "level");
     notify(tr("ach.toast") + title);
     sendToWin("celebrate");
   }
@@ -271,6 +338,8 @@ function createWindow() {
       // critical: this window is never focused while you work elsewhere —
       // without this Chromium throttles/pauses rAF & timers and the pet freezes
       backgroundThrottling: false,
+      // 🔊 8-bit sfx (opt-in) play without a click on the never-focused window
+      autoplayPolicy: "no-user-gesture-required",
     },
   });
   win.setAlwaysOnTop(true, "screen-saver");
@@ -330,7 +399,7 @@ function createWindow() {
           // CLAUDE_PET_SMOKE_SHOT=/path.png: force the HUD open and capture it
           if (process.env.CLAUDE_PET_SMOKE_SHOT) {
             await win.webContents.executeJavaScript(
-              "(function(){const h=document.getElementById('hud');if(h)h.classList.remove('hidden');const i=document.getElementById('island');if(i){i.classList.remove('collapsed');i.classList.add('expanded');}})()");
+              "(function(){const h=document.getElementById('hud');if(h)h.classList.remove('hidden');const i=document.getElementById('island');if(i){i.classList.remove('collapsed');i.classList.add('expanded');}const r=document.getElementById('report');if(r&&process_env_report)r.click();})()".replace("process_env_report", process.env.CLAUDE_PET_SMOKE_REPORT ? "true" : "false"));
             await new Promise((r) => setTimeout(r, 700));
             const img = await win.webContents.capturePage();
             fs.writeFileSync(process.env.CLAUDE_PET_SMOKE_SHOT, img.toPNG());
@@ -527,6 +596,7 @@ function checkClaudeNotifications(usage) {
   const pct = usage.fiveHour ? usage.fiveHour.pct : null;
   if (prevFiveHourPct !== null && pct !== null && prevFiveHourPct >= 80 && pct <= prevFiveHourPct - 50) {
     sendToWin("celebrate");
+    sendToWin("sfx", "reset");
     notify(tr("celebrate.reset"));
     if (garden) { G.water(garden); saveGarden(); }   // a reset waters the garden
   }
@@ -535,7 +605,18 @@ function checkClaudeNotifications(usage) {
   const wk = usage.week ? usage.week.pct : null;
   if (prevWeekPct !== null && wk !== null && prevWeekPct >= 50 && wk <= prevWeekPct - 40) {
     sendToWin("celebrate");
-    notify(tr("celebrate.weekReset"));
+    sendToWin("sfx", "reset");
+    // 📋 grade the week that just ended (history minus the post-reset sample)
+    const rep = reportPayload(settings.history.slice(0, -1));
+    if (rep && rep.grade) {
+      settings.lastReport = { ...rep, at: Date.now() };
+      notify(tr("report.notify").replace("{grade}", rep.grade).replace("{title}", tr("title." + rep.title))
+        .replace("{pct}", String(Math.round(rep.usedPct || 0))).replace("{n}", String(rep.depletions)));
+    } else {
+      notify(tr("celebrate.weekReset"));
+    }
+    const g = garden || G.newGarden();
+    settings.weekGarden = { harvested: g.harvested, lost: g.lost, shooed: g.shooed };
     if (garden) { G.water(garden); saveGarden(); }
   }
   if (wk !== null) prevWeekPct = wk;
@@ -651,7 +732,9 @@ async function poll(manual = false) {
     persistRateState();
     updateTrayTitle();
     if (fresh) checkClaudeNotifications(fresh);
-    sendToWin("usage", { ...usagePayload(merged), fetchedAt: Date.now() });
+    const payload = usagePayload(merged);
+    if (fresh) checkPaceAlarms(merged, payload.trend);
+    sendToWin("usage", { ...payload, fetchedAt: Date.now() });
     sendToWin("garden", gardenPayload());
   }
   scheduleNextPoll();
@@ -786,6 +869,13 @@ ipcMain.on("garden-plant", (_e, i, crop) => {
   if (!garden) return;
   gardenTick(false);
   if (G.plant(garden, Number(i), typeof crop === "string" ? crop : null, Date.now())) saveGarden();
+});
+ipcMain.on("garden-shoo", (_e, i) => {
+  if (!garden) return;
+  if (G.shoo(garden, Number(i), Date.now())) {
+    saveGarden();
+    bumpStat("crow");
+  }
 });
 ipcMain.on("garden-harvest", (_e, i) => {
   if (!garden) return;

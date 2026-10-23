@@ -7,6 +7,7 @@
 </head>
 <body>
   <div id="hud" class="hidden">
+    <canvas id="wx" class="wx hidden"></canvas>
     <div id="title-row">
       <button id="prev" class="pix-btn" data-i18n-title="tip.prev" title="上一只">◀</button>
       <span id="pet-name">…</span>
@@ -15,9 +16,11 @@
       <button id="menu" class="pix-btn" data-i18n-title="tip.menu" title="菜单">🐾</button>
       <button id="game" class="pix-btn" data-i18n-title="tip.game" title="玩游戏">🎮</button>
       <button id="feed" class="pix-btn" data-i18n-title="tip.feed" title="投喂">🍖</button>
+      <button id="report" class="pix-btn" data-i18n-title="tip.report" title="本周成绩单">📋</button>
       <button id="refresh" class="pix-btn" data-i18n-title="tip.refresh" title="立即刷新">↻</button>
       <button id="quit" class="pix-btn" data-i18n-title="tip.quit" title="退出">✕</button>
     </div>
+    <div id="report-card" class="report-card hidden"></div>
     <div class="bar-row"><span class="bar-label">5H</span>
       <div class="bar"><div id="bar5" class="bar-fill"></div></div>
       <span id="pct5" class="bar-pct">--%</span></div>
@@ -42,6 +45,7 @@
   <script src="gardensprites.js"></script>
   <script src="petcore.js"></script>
   <script src="i18n.js"></script>
+  <script src="sfx.js"></script>
   <script src="games.js"></script>
   <script src="pet.js"></script>
 </body>

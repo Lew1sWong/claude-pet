@@ -9,8 +9,9 @@
   const {
     computeMode, fmtCd, drawPet, frameCount, mergeCustomPets,
     renderOthers, renderScoped, renderExtra, renderBreakdown, renderTrend, renderGarden,
-    blockingWindow, lockedReason,
+    setWeatherFx, renderReport, blockingWindow, lockedReason,
   } = window.PetCore;
+  const sfx = (n) => { if (window.SFX) window.SFX.play(n); };
 
   const charsNow = () => Object.keys(SPRITES.frames);
   let character = "cat";
@@ -34,6 +35,8 @@
   const breakdownEl = document.getElementById("breakdown");
   const trendEl = document.getElementById("trend");
   const gardenEl = document.getElementById("garden");
+  const reportEl = document.getElementById("report-card");
+  const wxEl = document.getElementById("wx");
   const othersEl = document.getElementById("others");
 
   // ------------------------------------------------------------- state
@@ -160,6 +163,8 @@
     renderBreakdown(breakdownEl, usage);
     renderTrend(trendEl, usage);
     refreshGarden();
+    refreshReport();
+    refreshWeather();
     renderOthers(othersEl, usage && usage.others);
     nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
     msgEl.classList.add("hidden");
@@ -185,12 +190,14 @@
   let lastHarvestAt = 0;
   const CROP_EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻" };
   function onPlot(i, plot) {
-    if (!plot) api.gardenPlant(i, null);
+    if (plot && plot.crow) { api.gardenShoo(i); return; }          // 🐦‍⬛ shoo first
+    if (!plot) { api.gardenPlant(i, null); sfx("plant"); }
     else if (plot.progress >= 1) api.gardenHarvest(i);
     else sayTemp((plot.wilt >= 0.5 ? t("garden.thirsty") : t("garden.growing"))
       .replace("{crop}", t("crop." + plot.crop)).replace("{pct}", String(Math.round(plot.progress * 100))), 2000);
   }
   function celebrateHarvest(crop) {
+    sfx("harvest");
     sayTemp(HARVEST_LINES[Math.floor(Math.random() * HARVEST_LINES.length)], 2600);
     celebrateUntil = performance.now() + 1500;
     if (!hovering) autoExpand(3000);
@@ -198,6 +205,8 @@
     const tk = setInterval(() => { spawnFx(n % 2 ? "♥" : (CROP_EMOJI[crop] || "🌱")); if (++n > 4) clearInterval(tk); }, 220);
   }
   function refreshGarden() { renderGarden(gardenEl, gardenOn ? garden : null, onPlot); }
+  let lastShooed = -1;
+  let lastLossAt = 0;
   api.onGarden((g) => {
     garden = g;
     const h = g && g.lastHarvest;
@@ -205,8 +214,34 @@
       if (lastHarvestAt) celebrateHarvest(h.crop);   // not on the initial load
       lastHarvestAt = h.at;
     }
+    const shooed = g ? g.shooed || 0 : 0;
+    if (lastShooed >= 0 && shooed > lastShooed) { sfx("shoo"); sayTemp(t("garden.shooed"), 1800); spawnFx("🐦‍⬛"); spawnFx("💨"); }
+    lastShooed = shooed;
+    const loss = g && g.lastLoss;
+    if (loss && loss.at && loss.at !== lastLossAt) {
+      if (lastLossAt) { sayTemp(t("crow.lost").replace("{crop}", t("crop." + loss.crop)), 3000); spawnFx("🐦‍⬛"); }
+      lastLossAt = loss.at;
+    }
     refreshGarden();
   });
+  // 📋 weekly report card (toggle with the button; auto-opens when a new
+  // week was just graded)
+  let reportOpen = false;
+  let lastReportAt = 0;
+  function refreshReport() {
+    reportEl.classList.toggle("hidden", !reportOpen);
+    reportEl.parentElement.classList.toggle("report-mode", reportOpen);
+    if (reportOpen) renderReport(reportEl, usage && usage.report, usage && usage.lastReport);
+    fitExpanded();
+  }
+  document.getElementById("report").addEventListener("click", () => { reportOpen = !reportOpen; sfx("click"); refreshReport(); });
+  // ⛈ live weather on the overlay canvas, driven by the forecast
+  function refreshWeather() {
+    const tr = usage && usage.trend;
+    const wx = tr ? (tr.worst === "w" ? tr.week : tr.five) : null;
+    setWeatherFx(wxEl, wx ? wx.weather : "unknown", () => sfx("thunder"));
+  }
+  api.onSfx((n) => sfx(n));
 
   function applyState() {
     mode = computeMode(usage, errorCode);
@@ -353,6 +388,11 @@
   api.onUsage((d) => {
     const prev = mode;
     usage = d; errorCode = null;
+    const lr = d && d.lastReport;
+    if (lr && lr.at && lr.at !== lastReportAt) {
+      if (lastReportAt) { reportOpen = true; if (!hovering) autoExpand(9000); }
+      lastReportAt = lr.at;
+    }
     applyState();
     // live-activity: pop open only on a real tightening between two known moods
     // (not when arriving from the unknown/lost no-data states, e.g. on launch)
@@ -402,6 +442,7 @@
     const g = document.getElementById("game");
     if (g) g.style.display = (f && f.games) ? "" : "none";
     gardenOn = !(f && f.garden === false);
+    if (window.SFX) window.SFX.setEnabled(!!(f && f.sound));
     refreshGarden();
     fitExpanded();
   });
@@ -414,6 +455,8 @@
       renderScoped(scopedEl, usage);
       renderExtra(extraEl, usage);
     }
+    // 🐦‍⬛ keep the crow flapping while it's around
+    if (garden && garden.plots && garden.plots.some((p) => p && p.crow)) refreshGarden();
   }, 1000);
 
   applyState();

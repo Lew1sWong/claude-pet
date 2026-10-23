@@ -64,3 +64,41 @@ test("sanitize repairs persisted garbage", () => {
   assert.equal(g.lastTick, null);
   assert.deepEqual(G.sanitize(null).plots, [null, null, null]);
 });
+
+test("🐦‍⬛ crow: shows up on a ripe crop after 8 h, eats it 4 h later unless shooed", () => {
+  const g = G.newGarden();
+  G.plant(g, 0, "carrot", 0);
+  G.tick(g, "happy", 0);
+  G.tick(g, "happy", 5 * H1);                 // ripe at t=5h
+  assert.equal(g.plots[0].ripeAt, 5 * H1);
+  G.tick(g, "happy", 12 * H1);                // 7 h ripe → no crow yet
+  assert.equal(g.plots[0].crow, null);
+  G.tick(g, "happy", 13.5 * H1);              // 8.5 h → crow lands
+  assert.ok(g.plots[0].crow);
+  assert.equal(G.crowAt(g), 0);
+  assert.equal(G.shoo(g, 0, 14 * H1), true);  // shooed: timer restarts
+  assert.equal(g.plots[0].crow, null);
+  assert.equal(g.shooed, 1);
+  assert.equal(G.shoo(g, 0, 14 * H1), false);
+  G.tick(g, "happy", 19 * H1);                // 5 h since shoo → no crow (needs 8 h)
+  assert.equal(g.plots[0].crow, null);
+  G.tick(g, "happy", 23 * H1);                // 9 h → crow again
+  assert.ok(g.plots[0].crow);
+  G.tick(g, "happy", 26 * H1);                // ignored 3 h → still there
+  assert.ok(g.plots[0]);
+  G.tick(g, "happy", 27.5 * H1);              // 4.5 h → gone
+  assert.equal(g.plots[0], null);
+  assert.equal(g.lost, 1);
+  assert.equal(g.lastLoss.crop, "carrot");
+  assert.equal(G.crowAt(g), -1);
+});
+
+test("harvesting a crop with a crow on it still works; sanitize keeps crow fields", () => {
+  const g = G.newGarden();
+  g.plots[1] = { crop: "tomato", progress: 1, wilt: 0, plantedAt: 0, ripeAt: 0, crow: { since: 1 } };
+  assert.equal(G.harvest(g, 1), "tomato");
+  const s = G.sanitize({ plots: [null, null, { crop: "sunflower", progress: 1, ripeAt: 5, crow: { since: 9 } }], lost: 2, shooed: "3", lastLoss: { crop: "carrot", at: 7 } });
+  assert.deepEqual(s.plots[2].crow, { since: 9 });
+  assert.equal(s.plots[2].ripeAt, 5);
+  assert.equal(s.lost, 2); assert.equal(s.shooed, 3); assert.deepEqual(s.lastLoss, { crop: "carrot", at: 7 });
+});
