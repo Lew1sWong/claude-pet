@@ -69,6 +69,11 @@ Claude's usage API (as of Oct 2026) reports a structured list of limits instead 
 - **This week** — a one-liner of where the weekly usage went (Claude Code / Chats / Cowork / Other).
 - **Locks** — if a window is locked (e.g. by an org policy) the HUD says so instead of showing a misleading countdown.
 
+### 🌱 Pixel garden & 📈 quota weather
+
+- **Pixel garden** — three plots live under the usage bars (and in the Dynamic Island's lower area). Click an empty plot to plant; carrots 🥕, tomatoes 🍅 and sunflowers 🌻 grow at the pace of the pet's mood: a happy, well-rationed Claude means a thriving garden, burning through the quota stalls it, and a depleted quota leaves the plants thirsty 💧. Every reset waters them. Ripe crops glow — click to harvest and feed the pet (10 harvests unlock the 🌱 *Harvest Master* medal). Toggle it in Settings → Features.
+- **Trend sparklines + forecast** — the HUD keeps 7 days of history and draws two 8-bit sparklines (5h window over 6 hours, weekly over 7 days). A burn-rate forecast tells you whether you'll make it to the reset at the current pace: ☀️ fine · 🌤 tight · 🌧 runs dry before the reset · ⛈ running dry fast — and the pet nags you about the pace when it turns bad.
+
 ### Track OTHER agents too (Codex / OpenClaw 🦞 / anything)
 
 Claude isn't the only thing burning tokens. In **Settings → Usage sources** you can enable:
@@ -203,6 +208,11 @@ Claude 的用量接口（2026 年 10 月起）返回的是一张结构化的额�
 - **额外用量 💸**（官方叫「用量积分 / usage credits」，接口字段是 `extra_usage`）—— 开了的话，会多一根金色进度条显示月消费上限用了多少（和金额）。计划额度烧光但积分还在顶着时（Claude Code 里显示 "Now using credits"），宠物不会睡觉，而是进入 **烧钱** 心情：来回踱步、碎碎念账单，并在用到上限的 **80% / 95%** 时弹通知。
 - **本周去向** —— 一行小字告诉你这周的额度花在了哪（Claude Code / 对话 / Cowork / 其他）。
 - **锁定** —— 某条额度被锁定（比如组织策略）时，面板会直接说明，而不是显示一个误导的倒计时。
+
+### 🌱 像素菜园 & 📈 额度天气
+
+- **像素菜园** —— 用量条下面（灵动岛则在展开面板的下半区）有三块小地。点空地播种，胡萝卜 🥕、番茄 🍅、向日葵 🌻 会按宠物的心情长：额度省着用、宠物开心，菜就长得快；额度烧得猛就停滞；额度耗尽时菜会口渴 💧 蔫掉。每次额度重置都会给菜园浇水。成熟的作物会发光，点一下就收获喂给宠物（收获 10 次解锁 🌱「丰收达人」勋章）。可在 设置 → 功能 里关掉。
+- **趋势折线 + 预测** —— 面板保存 7 天用量历史，画两条 8-bit 折线（5h 窗口看最近 6 小时，周窗口看 7 天）。按当前消耗速度预测能不能撑到重置：☀️ 稳 · 🌤 刚好 · 🌧 重置前就会用完 · ⛈ 烧得太快 —— 天气变差时宠物还会碎碎念提醒你悠着点。
 
 ### 也能追踪其他 Agent 的用量（Codex / OpenClaw 龙虾 🦞 / 任意工具）
 

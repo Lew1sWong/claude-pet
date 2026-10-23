@@ -166,3 +166,25 @@ html, body {
 /* the HUD can now outgrow the window (many sources) — scroll instead of clipping */
 #hud { max-height: calc(100% - 8px); overflow-y: auto; scrollbar-width: none; }
 #hud::-webkit-scrollbar { display: none; }
+
+/* ---------------- 0.3.0: 📈 trend sparklines + 🌱 pixel garden ---------------- */
+.spark-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.spark { flex: 1; height: 14px; image-rendering: pixelated; border: 1px solid #555; }
+.trend-line { margin: 3px 0 0 26px; color: #9a9ab0; font-size: 10px; line-height: 1.35; }
+.garden-row { display: flex; gap: 8px; justify-content: center; margin-top: 6px; }
+.plot {
+  width: 40px; height: 40px;
+  image-rendering: pixelated;
+  border: 1px solid #555;
+  background: rgba(255,255,255,.04);
+  cursor: pointer;
+}
+.plot.empty { opacity: .75; }
+.plot.empty:hover { opacity: 1; box-shadow: 0 0 0 1px #9a9ab0 inset; }
+.plot.thirsty { filter: saturate(.55) brightness(.9); }
+.plot.ripe { animation: ripe-glow 1.4s steps(2) infinite; }
+@keyframes ripe-glow {
+  from { box-shadow: 0 0 0 1px #f5d142; }
+  to   { box-shadow: 0 0 0 2px #f28c28; }
+}
+.garden-hint { margin-top: 3px; text-align: center; color: #9a9ab0; font-size: 10px; }

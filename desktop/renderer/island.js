@@ -8,7 +8,7 @@
   const t = window.t;   // i18n lookup (reads window.I18N live)
   const {
     computeMode, fmtCd, drawPet, frameCount, mergeCustomPets,
-    renderOthers, renderScoped, renderExtra, renderBreakdown,
+    renderOthers, renderScoped, renderExtra, renderBreakdown, renderTrend, renderGarden,
     blockingWindow, lockedReason,
   } = window.PetCore;
 
@@ -32,6 +32,8 @@
   const scopedEl = document.getElementById("scoped");
   const extraEl = document.getElementById("extra");
   const breakdownEl = document.getElementById("breakdown");
+  const trendEl = document.getElementById("trend");
+  const gardenEl = document.getElementById("garden");
   const othersEl = document.getElementById("others");
 
   // ------------------------------------------------------------- state
@@ -84,6 +86,7 @@
     click: ["陪你工作~", "加油加油!", "想我了吗?", "❤"],
     feed: ["谢谢~ 你也要好好吃饭!", "啊呜~ 一起补充能量!"],
   };
+  let HARVEST_LINES = ["啊呜~ 自己种的最香!", "咔嚓咔嚓~ 新鲜!", "谢谢你照顾菜园 ❤"];
 
   // ------------------------------------------------------------- pet animation
   let microState = null;   // idle micro-animation: "yawn" | "stretch"
@@ -119,12 +122,12 @@
 
   // ------------------------------------------------------------- usage / hud
   // grow the expanded capsule to fit extra rows (scoped limits / extra usage /
-  // breakdown / other agents), capped just under the 420px host window
+  // breakdown / trend / garden / other agents), capped just under the 500px host window
   function fitExpanded() {
     const body = document.querySelector(".body");
     if (!body) return;
     const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bar-h")) || 32;
-    const h = Math.max(300, Math.min(412, barH + body.scrollHeight + 6));
+    const h = Math.max(300, Math.min(492, barH + body.scrollHeight + 6));
     document.documentElement.style.setProperty("--expanded-h", h + "px");
   }
 
@@ -155,6 +158,8 @@
     renderScoped(scopedEl, usage);
     renderExtra(extraEl, usage);
     renderBreakdown(breakdownEl, usage);
+    renderTrend(trendEl, usage);
+    refreshGarden();
     renderOthers(othersEl, usage && usage.others);
     nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
     msgEl.classList.add("hidden");
@@ -172,6 +177,36 @@
     fitExpanded();   // after the message box exists, so it's counted in the height
   }
   function show(el, text) { el.textContent = text; el.classList.remove("hidden"); }
+
+
+  // ------------------------------------------------------------- 🌱 garden
+  let garden = null;
+  let gardenOn = true;
+  let lastHarvestAt = 0;
+  const CROP_EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻" };
+  function onPlot(i, plot) {
+    if (!plot) api.gardenPlant(i, null);
+    else if (plot.progress >= 1) api.gardenHarvest(i);
+    else sayTemp((plot.wilt >= 0.5 ? t("garden.thirsty") : t("garden.growing"))
+      .replace("{crop}", t("crop." + plot.crop)).replace("{pct}", String(Math.round(plot.progress * 100))), 2000);
+  }
+  function celebrateHarvest(crop) {
+    sayTemp(HARVEST_LINES[Math.floor(Math.random() * HARVEST_LINES.length)], 2600);
+    celebrateUntil = performance.now() + 1500;
+    if (!hovering) autoExpand(3000);
+    let n = 0;
+    const tk = setInterval(() => { spawnFx(n % 2 ? "♥" : (CROP_EMOJI[crop] || "🌱")); if (++n > 4) clearInterval(tk); }, 220);
+  }
+  function refreshGarden() { renderGarden(gardenEl, gardenOn ? garden : null, onPlot); }
+  api.onGarden((g) => {
+    garden = g;
+    const h = g && g.lastHarvest;
+    if (h && h.at && h.at !== lastHarvestAt) {
+      if (lastHarvestAt) celebrateHarvest(h.crop);   // not on the initial load
+      lastHarvestAt = h.at;
+    }
+    refreshGarden();
+  });
 
   function applyState() {
     mode = computeMode(usage, errorCode);
@@ -358,6 +393,7 @@
     if (d.lines) {
       CLICK_LINES = d.lines.click; FEED_LINES = d.lines.feed; COMBO = d.lines.combo; RESET_LINE = d.lines.reset;
       if (d.lines.buddy) BUDDY_LINES = d.lines.buddy;
+      if (d.lines.harvest) HARVEST_LINES = d.lines.harvest;
     }
     if (window.applyI18n) window.applyI18n();
     refreshMini(); refreshBody(); refreshBubble();
@@ -365,6 +401,9 @@
   api.onFeatures((f) => {
     const g = document.getElementById("game");
     if (g) g.style.display = (f && f.games) ? "" : "none";
+    gardenOn = !(f && f.garden === false);
+    refreshGarden();
+    fitExpanded();
   });
 
   // keep countdowns live

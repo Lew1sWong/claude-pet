@@ -67,15 +67,19 @@ test("errors + others fallback", () => {
   assert.equal(PetCore.computeMode({ fiveHour: { pct: 10 }, week: { pct: 10 }, fable: { pct: 80 } }, null), "sleepy");
 });
 
-test("petcore and lib agree on planExhausted / isOverage across a grid", () => {
+test("petcore and lib agree on planExhausted / isOverage / mood across a grid", () => {
   let n = 0;
-  for (const s of [0, 50, 99, 99.5, 100]) for (const w of [0, 99, 100]) for (const ex of [null, { is_enabled: true, utilization: 10 }, { is_enabled: true, utilization: 100 }, { is_enabled: true, spend_limit_reached: true }, { is_enabled: false }]) {
-    const u = withLimits(s, w, 0, ex);
+  for (const s of [0, 45, 75, 99, 99.5, 100]) for (const w of [0, 50, 99, 100]) for (const sc of [0, 92]) for (const ex of [null, { is_enabled: true, utilization: 10 }, { is_enabled: true, utilization: 100 }, { is_enabled: true, spend_limit_reached: true }, { is_enabled: false }]) {
+    const u = withLimits(s, w, sc, ex);
     assert.equal(PetCore.planExhausted(u), lib.planExhausted(u), `planExhausted s=${s} w=${w}`);
     assert.equal(PetCore.isOverage(u), lib.isOverage(u), `isOverage s=${s} w=${w} ex=${JSON.stringify(ex)}`);
+    assert.equal(PetCore.computeMode(u, null), lib.computeMood(u), `mood s=${s} w=${w} sc=${sc} ex=${JSON.stringify(ex)}`);
     n++;
   }
-  assert.ok(n > 50);
+  for (const u of [null, { fiveHour: null, week: null, scoped: [], others: [] }, { fiveHour: null, week: null, scoped: [], others: [{ windows: [{ pct: 95 }] }] }, { fiveHour: { pct: 10 }, week: { pct: 10 }, fable: { pct: 80 } }]) {
+    assert.equal(PetCore.computeMode(u, null), lib.computeMood(u));
+  }
+  assert.ok(n > 200);
 });
 
 test("extraSummary / fmtMoney", () => {

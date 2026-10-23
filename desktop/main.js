@@ -6,7 +6,9 @@ const {
 const path = require("path");
 const fs = require("fs");
 const { readCredentials } = require("./lib/credentials");
-const { fetchUsage, normalize, pickClaude, isOverage } = require("./lib/usageClient");
+const { fetchUsage, normalize, pickClaude, isOverage, computeMood } = require("./lib/usageClient");
+const { pushSample, trendOf } = require("./lib/history");
+const G = require("./lib/garden");
 const { collectOthers } = require("./lib/providers");
 const { createBossController, DEFAULT_DISGUISES } = require("./lib/bossKey");
 const { readNotch } = require("./lib/notch");
@@ -20,12 +22,12 @@ const PROFESSIONS = [
 ];
 
 const WIN_W = 230;
-const WIN_H = 260;            // taller HUD: scoped limits / extra usage / breakdown rows
+const WIN_H = 380;            // taller HUD: scoped limits / extra usage / breakdown / trend / garden
 const LEGACY_WIN_H = 215;     // height before 0.2.0 — keeps a saved y stable across the bump
 // Dynamic Island window — bigger than the pill itself so the expanded panel
 // and drop-shadow have room; the actual capsule is sized/animated in CSS.
 const ISLAND_W = 420;
-const ISLAND_H = 420;
+const ISLAND_H = 500;
 // single source of truth for the character menus (tray + right-click on pet)
 const CHARACTERS = [
   ["cat", "🐱 小橘"],
@@ -64,6 +66,8 @@ let islandNotch = null;      // native notch geometry for the Dynamic Island
 let settingsLoaded = false;  // guard: never persist {} if we quit before loading
 let settingsWin = null;      // the Settings / onboarding window
 let bossStarted = false;     // whether the boss-key hook is currently running
+let garden = null;           // 🌱 pixel garden state (lib/garden.js), persisted in settings
+let gardenTimer = null;      // grows between polls too
 
 // ---------------------------------------------------------------- settings
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
@@ -74,6 +78,8 @@ function loadSettings() {
   // restore rate-limit state so a restart can't bypass an active cooldown
   cooldownUntil = Number(settings.cooldownUntil) || 0;
   backoffLevel = Number(settings.backoffLevel) || 0;
+  garden = G.sanitize(settings.garden);
+  settings.history = Array.isArray(settings.history) ? settings.history : [];
   if (settings.lastUsage && settings.lastUsageAt) {
     // pre-0.2.0 caches carry `raw` and a bare `fable` (no label/key, no
     // `scoped`) — normalise once so every consumer sees the 0.2.0 contract
@@ -113,10 +119,31 @@ function broadcastI18n() {
   const lang = resolveLang();
   sendToWin("i18n", { lang, dict: STR.pick(lang), lines: STR.lines[lang] });
 }
-// default: usage tracking ON, games + boss OFF (chosen at onboarding)
+// default: usage tracking + garden ON, games + boss OFF (chosen at onboarding)
 function featureFlags() {
   const f = settings.features || {};
-  return { usage: f.usage !== false, games: !!f.games, boss: !!f.boss };
+  return { usage: f.usage !== false, games: !!f.games, boss: !!f.boss, garden: f.garden !== false };
+}
+
+// ---- 🌱 garden: grows at the pace of the current mood, persisted in settings ----
+function gardenPayload() {
+  return { ...garden, lastHarvest: settings.gardenLastHarvest || null };
+}
+function gardenTick(send) {
+  if (!garden || !featureFlags().garden) return;
+  const before = JSON.stringify(garden.plots);
+  G.tick(garden, computeMood(lastUsage), Date.now());
+  settings.garden = garden;
+  if (send && JSON.stringify(garden.plots) !== before) sendToWin("garden", gardenPayload());
+}
+function saveGarden() {
+  settings.garden = garden;
+  saveSettings();
+  sendToWin("garden", gardenPayload());
+}
+// usage + the trend computed from the persisted history, as the renderer expects it
+function usagePayload(u) {
+  return { ...u, trend: trendOf(settings.history, u, Date.now()) };
 }
 
 // which usage sources to poll: Claude on by default; Codex / OpenClaw(龙虾) /
@@ -172,14 +199,15 @@ function sanitizeCustomPets(list) {
   return out;
 }
 
-// ---- achievements (彩蛋): 10 boss uses → 潜行大师, 10 game clears → 游戏达人
+// ---- achievements (彩蛋): 10 boss uses → 潜行大师, 10 game clears → 游戏达人,
+// 10 harvests → 丰收达人
 const ACH_GOAL = 10;
 function statsNow() {
   const s = settings.stats || {};
-  return { bossUses: s.bossUses || 0, gameClears: s.gameClears || 0 };
+  return { bossUses: s.bossUses || 0, gameClears: s.gameClears || 0, harvests: s.harvests || 0 };
 }
 function bumpStat(kind) {
-  const map = { boss: "bossUses", game: "gameClears" };
+  const map = { boss: "bossUses", game: "gameClears", harvest: "harvests" };
   const k = map[kind];
   if (!k) return;
   const st = statsNow();
@@ -189,7 +217,7 @@ function bumpStat(kind) {
   saveSettings();
   if (before < ACH_GOAL && st[k] >= ACH_GOAL) {
     // newly unlocked → toast + the pet celebrates
-    const title = tr(kind === "boss" ? "ach.boss.title" : "ach.game.title");
+    const title = tr(kind === "boss" ? "ach.boss.title" : kind === "harvest" ? "ach.harvest.title" : "ach.game.title");
     notify(tr("ach.toast") + title);
     sendToWin("celebrate");
   }
@@ -275,8 +303,9 @@ function createWindow() {
       });
     }
     // show cached data instantly so the pet isn't blank while we wait
+    sendToWin("garden", gardenPayload());
     if (lastUsage) {
-      sendToWin("usage", { ...lastUsage, fetchedAt: settings.lastUsageAt || Date.now() });
+      sendToWin("usage", { ...usagePayload(lastUsage), fetchedAt: settings.lastUsageAt || Date.now() });
     } else if (Date.now() < cooldownUntil) {
       sendToWin("usage-error", {
         code: "rate-limit",
@@ -298,6 +327,15 @@ function createWindow() {
             "(function(){const h=document.getElementById('hud')||document.querySelector('.body');return h?h.textContent.replace(/\\s+/g,' ').trim():'(no hud)';})()");
           console.log("SMOKE HUD:", JSON.stringify(txt));
           console.log("SMOKE usage:", JSON.stringify(lastUsage ? pickClaude(lastUsage) : null));
+          // CLAUDE_PET_SMOKE_SHOT=/path.png: force the HUD open and capture it
+          if (process.env.CLAUDE_PET_SMOKE_SHOT) {
+            await win.webContents.executeJavaScript(
+              "(function(){const h=document.getElementById('hud');if(h)h.classList.remove('hidden');const i=document.getElementById('island');if(i){i.classList.remove('collapsed');i.classList.add('expanded');}})()");
+            await new Promise((r) => setTimeout(r, 700));
+            const img = await win.webContents.capturePage();
+            fs.writeFileSync(process.env.CLAUDE_PET_SMOKE_SHOT, img.toPNG());
+            console.log("SMOKE shot:", process.env.CLAUDE_PET_SMOKE_SHOT, img.getSize());
+          }
         } catch (e) { console.log("SMOKE error:", String((e && e.message) || e)); }
       }, 15000);
     }
@@ -490,6 +528,7 @@ function checkClaudeNotifications(usage) {
   if (prevFiveHourPct !== null && pct !== null && prevFiveHourPct >= 80 && pct <= prevFiveHourPct - 50) {
     sendToWin("celebrate");
     notify(tr("celebrate.reset"));
+    if (garden) { G.water(garden); saveGarden(); }   // a reset waters the garden
   }
   if (pct !== null) prevFiveHourPct = pct;
 
@@ -497,6 +536,7 @@ function checkClaudeNotifications(usage) {
   if (prevWeekPct !== null && wk !== null && prevWeekPct >= 50 && wk <= prevWeekPct - 40) {
     sendToWin("celebrate");
     notify(tr("celebrate.weekReset"));
+    if (garden) { G.water(garden); saveGarden(); }
   }
   if (wk !== null) prevWeekPct = wk;
 
@@ -599,10 +639,20 @@ async function poll(manual = false) {
     lastUsage = merged;
     settings.lastUsage = merged;
     settings.lastUsageAt = Date.now();
+    if (fresh) {
+      // 📈 one history sample per fresh fetch (feeds the sparklines + forecast)
+      settings.history = pushSample(settings.history, {
+        t: Date.now(),
+        f: fresh.fiveHour ? fresh.fiveHour.pct : null,
+        w: fresh.week ? fresh.week.pct : null,
+      }, Date.now());
+    }
+    gardenTick(false);
     persistRateState();
     updateTrayTitle();
     if (fresh) checkClaudeNotifications(fresh);
-    sendToWin("usage", { ...merged, fetchedAt: Date.now() });
+    sendToWin("usage", { ...usagePayload(merged), fetchedAt: Date.now() });
+    sendToWin("garden", gardenPayload());
   }
   scheduleNextPoll();
 }
@@ -731,6 +781,22 @@ ipcMain.on("boss-toggle", () => { if (boss) boss.toggle(); });
 // achievements: a mini-game was cleared
 ipcMain.on("stat-bump", (_e, kind) => bumpStat(kind));
 
+// 🌱 garden: plant an empty plot / harvest a ripe one
+ipcMain.on("garden-plant", (_e, i, crop) => {
+  if (!garden) return;
+  gardenTick(false);
+  if (G.plant(garden, Number(i), typeof crop === "string" ? crop : null, Date.now())) saveGarden();
+});
+ipcMain.on("garden-harvest", (_e, i) => {
+  if (!garden) return;
+  gardenTick(false);
+  const crop = G.harvest(garden, Number(i));
+  if (!crop) return;
+  settings.gardenLastHarvest = { crop, at: Date.now() };
+  saveGarden();
+  bumpStat("harvest");
+});
+
 // settings window
 ipcMain.on("settings-update", (_e, patch) => applySettingsPatch(patch));
 ipcMain.on("open-settings", () => openSettings());
@@ -779,6 +845,8 @@ if (!gotLock) {
     });
     startBossIfEnabled();   // only if the boss feature is on
     buildTray();
+    // 🌱 the garden keeps growing between polls (mood is stable in between)
+    gardenTimer = setInterval(() => gardenTick(true), 60 * 1000);
     // first run: pop the onboarding (pick language + features)
     if (!settings.onboarded) openSettings({ onboarding: true });
     // first poll is scheduled from did-finish-load (after cache is shown);
@@ -796,6 +864,8 @@ function cleanup() {
   isQuitting = true;
   if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
   if (dragTimer) { clearInterval(dragTimer); dragTimer = null; }
+  if (gardenTimer) { clearInterval(gardenTimer); gardenTimer = null; }
+  try { gardenTick(false); } catch { /* ignore */ }
   // boss.stop() kills the node-global-key-listener native subprocess; without
   // this it would survive as an orphan still holding Accessibility access
   try { if (boss) boss.stop(); } catch { /* ignore */ }

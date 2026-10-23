@@ -26,6 +26,8 @@
   const scopedEl = document.getElementById("scoped");
   const extraEl = document.getElementById("extra");
   const breakdownEl = document.getElementById("breakdown");
+  const trendEl = document.getElementById("trend");
+  const gardenEl = document.getElementById("garden");
   const othersEl = document.getElementById("others");
 
   // ------------------------------------------------------------- state
@@ -103,12 +105,17 @@
     click: ["陪你工作~", "加油加油!", "想我了吗?", "❤"],
     feed: ["谢谢~ 你也要好好吃饭!", "啊呜~ 一起补充能量!"],
   };
+  let WEATHER_LINES = {
+    rain: ["🌧 照这速度撑不到重置哦…", "省着点, 等会儿还要用呢"],
+    storm: ["⛈ 慢点慢点! 这速度今晚要饿肚子", "额度在狂泻… 💦"],
+  };
+  let HARVEST_LINES = ["啊呜~ 自己种的最香!", "咔嚓咔嚓~ 新鲜!", "谢谢你照顾菜园 ❤"];
 
   // ------------------------------------------------------------- pet brain
   // shared, kept identical between the floating pet and the Dynamic Island
   const {
     computeMode, fmtCd, drawPet, frameCount, mergeCustomPets,
-    renderOthers, renderScoped, renderExtra, renderBreakdown,
+    renderOthers, renderScoped, renderExtra, renderBreakdown, renderTrend, renderGarden,
     blockingWindow, lockedReason,
   } = window.PetCore;
 
@@ -224,6 +231,8 @@
     renderScoped(scopedEl, usage);
     renderExtra(extraEl, usage);
     renderBreakdown(breakdownEl, usage);
+    renderTrend(trendEl, usage);
+    refreshGarden();
     renderOthers(othersEl, usage && usage.others);
     nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
 
@@ -278,6 +287,35 @@
     document.body.appendChild(fx);
     setTimeout(() => fx.remove(), 1200);
   }
+
+
+  // ------------------------------------------------------------- 🌱 garden
+  let garden = null;
+  let gardenOn = true;
+  let lastHarvestAt = 0;
+  const CROP_EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻" };
+  function onPlot(i, plot) {
+    if (!plot) api.gardenPlant(i, null);
+    else if (plot.progress >= 1) api.gardenHarvest(i);
+    else sayTemp((plot.wilt >= 0.5 ? t("garden.thirsty") : t("garden.growing"))
+      .replace("{crop}", t("crop." + plot.crop)).replace("{pct}", String(Math.round(plot.progress * 100))), 2000);
+  }
+  function celebrateHarvest(crop) {
+    sayTemp(HARVEST_LINES[Math.floor(Math.random() * HARVEST_LINES.length)], 2600);
+    celebrateUntil = performance.now() + 1500;
+    let n = 0;
+    const tk = setInterval(() => { spawnFx(n % 2 ? "♥" : (CROP_EMOJI[crop] || "🌱")); if (++n > 4) clearInterval(tk); }, 220);
+  }
+  function refreshGarden() { renderGarden(gardenEl, gardenOn ? garden : null, onPlot); }
+  api.onGarden((g) => {
+    garden = g;
+    const h = g && g.lastHarvest;
+    if (h && h.at && h.at !== lastHarvestAt) {
+      if (lastHarvestAt) celebrateHarvest(h.crop);   // not on the initial load
+      lastHarvestAt = h.at;
+    }
+    refreshGarden();
+  });
 
   function applyState() {
     const prev = mode;
@@ -404,7 +442,11 @@
     if (t < nextQuip || dragging || paused) return;
     if (mode === "depleted" || mode === "lost" || mode === "unknown") return;
     if (bubble.classList.contains("hidden")) {
-      const pool = QUIPS[mode] || QUIPS.calm;
+      let pool = QUIPS[mode] || QUIPS.calm;
+      // quota weather turning bad → the pet nags about the pace half the time
+      const tr = usage && usage.trend;
+      const wx = tr && (tr.worst === "w" ? tr.week : tr.five);
+      if (wx && WEATHER_LINES[wx.weather] && Math.random() < 0.5) pool = WEATHER_LINES[wx.weather];
       sayTemp(pool[Math.floor(Math.random() * pool.length)], 2800);
     }
     nextQuip = t + 70000 + Math.random() * 170000;
@@ -474,6 +516,8 @@
       if (d.lines.reset) RESET_LINE = d.lines.reset;
       if (d.lines.micro) MICRO_LINES = d.lines.micro;
       if (d.lines.buddy) BUDDY_LINES = d.lines.buddy;
+      if (d.lines.weather) WEATHER_LINES = d.lines.weather;
+      if (d.lines.harvest) HARVEST_LINES = d.lines.harvest;
     }
     if (window.applyI18n) window.applyI18n();
     refreshHud(); refreshBubble();
@@ -481,6 +525,8 @@
   api.onFeatures((f) => {
     const g = document.getElementById("game");
     if (g) g.style.display = (f && f.games) ? "" : "none";
+    gardenOn = !(f && f.garden === false);
+    refreshGarden();
   });
 
   setInterval(() => {

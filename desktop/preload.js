@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld("petAPI", {
   bossToggle: () => ipcRenderer.send("boss-toggle"),
   gameClear: () => ipcRenderer.send("stat-bump", "game"),
   onStats: (cb) => ipcRenderer.on("stats", (_e, s) => cb(s)),
+  // 🌱 pixel garden
+  onGarden: (cb) => ipcRenderer.on("garden", (_e, g) => cb(g)),
+  gardenPlant: (i, crop) => ipcRenderer.send("garden-plant", i, crop),
+  gardenHarvest: (i) => ipcRenderer.send("garden-harvest", i),
   dragStart: (offX, offY) => ipcRenderer.send("drag-start", offX, offY),
   dragEnd: () => ipcRenderer.send("drag-end"),
   setIgnore: (v) => ipcRenderer.send("set-ignore", v),

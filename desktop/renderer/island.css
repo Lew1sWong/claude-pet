@@ -209,3 +209,25 @@ html, body {
   font-size: 10px;
   line-height: 1.35;
 }
+
+/* ---------------- 0.3.0: 📈 trend sparklines + 🌱 pixel garden ---------------- */
+.spark-row { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.spark { flex: 1; height: 14px; image-rendering: pixelated; border-radius: 4px; }
+.trend-line { margin: 3px 0 0 30px; color: #9a9ab0; font-size: 10px; line-height: 1.35; }
+.garden-row { display: flex; gap: 12px; justify-content: center; margin-top: 8px; }
+.plot {
+  width: 44px; height: 44px;
+  image-rendering: pixelated;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .06);
+  cursor: pointer;
+}
+.plot.empty { opacity: .7; }
+.plot.empty:hover { opacity: 1; background: rgba(255, 255, 255, .12); }
+.plot.thirsty { filter: saturate(.55) brightness(.9); }
+.plot.ripe { animation: ripe-glow 1.4s ease-in-out infinite; }
+@keyframes ripe-glow {
+  0%, 100% { box-shadow: 0 0 0 1px #f5d142; }
+  50%      { box-shadow: 0 0 10px 2px rgba(245, 209, 66, .6); }
+}
+.garden-hint { margin-top: 4px; text-align: center; color: #9a9ab0; font-size: 10px; }

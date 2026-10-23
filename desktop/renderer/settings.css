@@ -119,3 +119,10 @@ footer { padding-top: 16px; }
 .primary:hover { background: #4a6be0; }
 
 .hidden { display: none !important; }
+
+/* 🌱 harvest medal */
+.medal.unlocked.m-harvest .badge {
+  border-color: #8fd98a;
+  background: radial-gradient(circle at 50% 32%, #d6f5c9, #4caf50 72%);
+  box-shadow: 0 0 16px rgba(92, 191, 95, .55);
+}
