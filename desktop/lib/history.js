@@ -6,8 +6,10 @@
 // "quota weather": will you make it to the reset at this pace?
 const MAX_SAMPLES = 2200;              // ~7.5 days at 5-min polls
 const MAX_AGE_MS = 7 * 24 * 3600e3;
-const LOOKBACK = { f: 75 * 60e3, w: 8 * 3600e3 };   // regression window per series
-const MIN_SPAN_MS = 10 * 60e3;         // need ≥10 min of data for a slope
+// regression window per series: the weekly one spans whole days so nights
+// and weekends average in (an 8-h workday slope over-predicts a week)
+const LOOKBACK = { f: 75 * 60e3, w: 48 * 3600e3 };
+const MIN_SPAN = { f: 10 * 60e3, w: 12 * 3600e3 };   // data needed before a slope means anything
 const RESET_DROP = 15;                 // a drop this big between samples = the window reset
 
 function pushSample(samples, s, now) {
@@ -36,7 +38,7 @@ function recent(samples, key, now) {
 function slopePerHour(pts, key) {
   if (pts.length < 3) return null;
   const span = pts[pts.length - 1].t - pts[0].t;
-  if (span < MIN_SPAN_MS) return null;
+  if (span < MIN_SPAN[key]) return null;
   const n = pts.length;
   let sx = 0, sy = 0, sxx = 0, sxy = 0;
   for (const p of pts) { const x = (p.t - pts[0].t) / 3600e3; sx += x; sy += p[key]; sxx += x * x; sxy += x * p[key]; }

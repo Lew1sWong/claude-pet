@@ -65,28 +65,32 @@ test("sanitize repairs persisted garbage", () => {
   assert.deepEqual(G.sanitize(null).plots, [null, null, null]);
 });
 
+// tick like the running app does (every few minutes)
+function run(g, mood, from, to, step = 5 * 60e3) {
+  for (let t = from; t <= to; t += step) G.tick(g, mood, t);
+}
+
 test("🐦‍⬛ crow: shows up on a ripe crop after 8 h, eats it 4 h later unless shooed", () => {
   const g = G.newGarden();
   G.plant(g, 0, "carrot", 0);
-  G.tick(g, "happy", 0);
-  G.tick(g, "happy", 5 * H1);                 // ripe at t=5h
+  run(g, "happy", 0, 5 * H1);                       // ripe at t=5h
   assert.equal(g.plots[0].ripeAt, 5 * H1);
-  G.tick(g, "happy", 12 * H1);                // 7 h ripe → no crow yet
+  run(g, "happy", 5 * H1, 12 * H1);                 // 7 h ripe → no crow yet
   assert.equal(g.plots[0].crow, null);
-  G.tick(g, "happy", 13.5 * H1);              // 8.5 h → crow lands
+  run(g, "happy", 12 * H1, 13.5 * H1);              // 8.5 h → crow lands
   assert.ok(g.plots[0].crow);
   assert.equal(G.crowAt(g), 0);
-  assert.equal(G.shoo(g, 0, 14 * H1), true);  // shooed: timer restarts
+  assert.equal(G.shoo(g, 0, 13.5 * H1), true);      // shooed: timer restarts
   assert.equal(g.plots[0].crow, null);
   assert.equal(g.shooed, 1);
-  assert.equal(G.shoo(g, 0, 14 * H1), false);
-  G.tick(g, "happy", 19 * H1);                // 5 h since shoo → no crow (needs 8 h)
+  assert.equal(G.shoo(g, 0, 13.5 * H1), false);
+  run(g, "happy", 13.5 * H1, 19 * H1);              // 5.5 h since shoo → no crow (needs 8 h)
   assert.equal(g.plots[0].crow, null);
-  G.tick(g, "happy", 23 * H1);                // 9 h → crow again
+  run(g, "happy", 19 * H1, 22 * H1);                // 8.5 h → crow again
   assert.ok(g.plots[0].crow);
-  G.tick(g, "happy", 26 * H1);                // ignored 3 h → still there
+  run(g, "happy", 22 * H1, 25 * H1);                // ignored ~3 h → still there
   assert.ok(g.plots[0]);
-  G.tick(g, "happy", 27.5 * H1);              // 4.5 h → gone
+  run(g, "happy", 25 * H1, 27 * H1);                // > 4 h → gone
   assert.equal(g.plots[0], null);
   assert.equal(g.lost, 1);
   assert.equal(g.lastLoss.crop, "carrot");
@@ -101,4 +105,22 @@ test("harvesting a crop with a crow on it still works; sanitize keeps crow field
   assert.deepEqual(s.plots[2].crow, { since: 9 });
   assert.equal(s.plots[2].ripeAt, 5);
   assert.equal(s.lost, 2); assert.equal(s.shooed, 3); assert.deepEqual(s.lastLoss, { crop: "carrot", at: 7 });
+});
+
+test("🐦‍⬛ sleep doesn't count toward the crow (clocks shift by time beyond the catch-up cap)", () => {
+  // crow landed at 23:00, lid closed 23:05, opened 07:00 → the crow is still there, not fed
+  const g = G.newGarden();
+  g.plots[0] = { crop: "carrot", progress: 1, wilt: 0, plantedAt: 0, ripeAt: 0, crow: { since: 23 * H1 } };
+  G.tick(g, "happy", 23 * H1);
+  G.tick(g, "happy", 23 * H1 + 5 * 60e3);
+  G.tick(g, "happy", 31 * H1);                   // 7 h 55 m later; cap is 6 h
+  assert.ok(g.plots[0], "crop survives the night");
+  assert.ok(g.plots[0].crow, "crow still waiting");
+  assert.ok(31 * H1 - g.plots[0].crow.since <= 20 * 60e3, "only the awake minutes counted");
+  // a ripe crop without a crow: its ripe clock shifts too
+  const h = G.newGarden();
+  h.plots[1] = { crop: "tomato", progress: 1, wilt: 0, plantedAt: 0, ripeAt: 0, crow: null };
+  G.tick(h, "happy", 1 * H1);
+  G.tick(h, "happy", 30 * H1);                   // 29 h away, cap 6 h → counts as 7 h ripe
+  assert.equal(h.plots[1].crow, null);
 });

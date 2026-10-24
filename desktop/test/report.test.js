@@ -81,3 +81,12 @@ test("crow losses cost points and add a tip; farmer title when harvesting a lot"
   const r = R.computeReport(series(MON, 5 * 24, f2, w), { localParts: parts, harvested: 3 }, MON + 5 * 24 * H1);
   assert.equal(r.title, "farmer");
 });
+
+test("no 'spread' tip on the first days of a window", () => {
+  const f = (h) => { const hod = h % 24; return hod >= 9 && hod < 17 ? ((hod - 9) / 8) * 50 : 0; };
+  const w = (h) => Math.min(100, h * 0.5);
+  const s = series(MON, 20, f, w);              // < 1 day, all on Monday
+  const r = R.computeReport(s, { localParts: parts }, MON + 20 * H1);
+  assert.equal(r.evenness, 0);
+  assert.ok(!r.tips.includes("spread"), "tips " + r.tips);
+});

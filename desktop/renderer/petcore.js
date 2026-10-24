@@ -457,7 +457,8 @@
 
   // ---- ⛈ live quota weather: pixel rain / lightning / sunny sparkles on an
   // overlay canvas (1 canvas px = 2 css px for that chunky look) ----
-  const FX = { canvas: null, weather: "unknown", raf: 0, drops: [], sparks: [], flashUntil: 0, nextFlash: 0, onThunder: null };
+  const FX = { canvas: null, weather: "unknown", raf: 0, drops: [], sparks: [], flashUntil: 0, nextFlash: 0, onThunder: null, lastThunder: -Infinity };
+  const THUNDER_GAP_MS = 60 * 1000;   // the flash can be frequent; the sound can't
   function setWeatherFx(canvas, weather, onThunder) {
     if (!canvas) return;
     FX.canvas = canvas;
@@ -502,7 +503,10 @@
         if (!FX.nextFlash) FX.nextFlash = t + 2500 + Math.random() * 5000;
         if (t >= FX.nextFlash) {
           FX.flashUntil = t + 140; FX.nextFlash = t + 4000 + Math.random() * 7000;
-          if (FX.onThunder) { try { FX.onThunder(); } catch { /* ignore */ } }
+          if (FX.onThunder && t - FX.lastThunder >= THUNDER_GAP_MS) {
+            FX.lastThunder = t;
+            try { FX.onThunder(); } catch { /* ignore */ }
+          }
         }
         if (t < FX.flashUntil) {
           ctx.fillStyle = "rgba(255, 255, 255, .28)"; ctx.fillRect(0, 0, w, h);

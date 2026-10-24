@@ -7,6 +7,8 @@
   the plot shakes, a notification + caw). Ignore it for 4 more hours and it
   flies off with the crop. Click the crow to shoo it (new 🐦‍⬛ *Scarecrow*
   medal at 10 shoos). Losses and shoos show up on the weekly report card.
+  The crow's clocks only run while the app is running — a sleeping laptop
+  or a closed app never costs you a crop.
 
 ### ⛈ Live quota weather
 - The forecast now has visuals: pixel rain over the HUD when the window is
@@ -15,13 +17,18 @@
   when you're fine.
 - **Pace alarm**: one notification per window instance when the forecast
   turns bad ("⛈ 照这速度 5h 额度 1 小时 12 分 后见底，离重置还有 3 小时").
+  The weekly forecast averages over up to 48 h (nights and weekends count)
+  and waits for 12 h of data after a reset; the weekly alarm also waits
+  until the window is ≥30 % used. Thunder plays at most once a minute (in
+  the Dynamic Island only while it's expanded).
 
 ### 📋 Weekly report card + titles
 - 📋 button in the HUD opens the card: grade S/A/B/C (score from
   depletions, close calls, late-night share, evenness, crow losses), a
   playful title — 烧 token 狂魔 / 夜猫子 / 周末战士 / 佛系用户 / 周一冲刺手 /
   节奏大师 / 种田能手 / 稳健开发者 — heaviest day, late-night share, garden
-  stats and up to two tips. At the weekly reset the finished week is graded,
+  stats and up to two tips. At every weekly reset the finished week is
+  graded (light weeks too, and resets that happened while the app slept),
   pushed as a notification and the card pops open.
 
 ### 🔊 8-bit sounds (off by default)

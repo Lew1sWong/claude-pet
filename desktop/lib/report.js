@@ -101,7 +101,7 @@ function computeReport(samples, opts, now) {
   if (r.depletions > 0) r.tips.push("depleted");
   if (r.lateNightShare >= 0.3) r.tips.push("owl");
   if (r.lost > 0) r.tips.push("crow");
-  if (r.evenness !== null && r.evenness < 0.4 && r.depletions === 0) r.tips.push("spread");
+  if (r.evenness !== null && r.evenness < 0.4 && r.depletions === 0 && now - r.since >= 3 * 24 * 3600e3) r.tips.push("spread");
   if (r.usedPct !== null && r.usedPct < 25 && pts.length > 24) r.tips.push("zen");
   r.tips = r.tips.slice(0, 2);
   return r;

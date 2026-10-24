@@ -52,6 +52,7 @@ let pollTimer = null;
 let prevFiveHourPct = null;
 let prevFablePct = null;     // Fable gets its own threshold reminders
 let prevWeekPct = null;      // weekly reset celebration
+let prevWeekReset = null;    // weekly window's resets_at — a new one means a new week
 let prevExtraPct = null;     // extra-usage (credits) threshold reminders
 let prevOverage = null;      // plan limits hit while credits carry the load
 const FABLE_THRESHOLDS = [80, 95];
@@ -88,6 +89,7 @@ function loadSettings() {
     prevFiveHourPct = lastUsage.fiveHour ? lastUsage.fiveHour.pct : null;
     prevFablePct = lastUsage.fable ? lastUsage.fable.pct : null;
     prevWeekPct = lastUsage.week ? lastUsage.week.pct : null;
+    prevWeekReset = lastUsage.week ? lastUsage.week.resetsAt || null : null;
     prevExtraPct = lastUsage.extra && typeof lastUsage.extra.pct === "number" ? lastUsage.extra.pct : null;
     prevOverage = isOverage(lastUsage);
   }
@@ -164,7 +166,10 @@ function checkPaceAlarms(u, trend) {
     const id = win && win.resetsAt ? String(win.resetsAt) : null;
     if (!o || !id) continue;
     const bad = key === "f" ? o.weather === "storm" : (o.weather === "storm" || o.weather === "rain");
-    if (bad && al[key] !== id) {
+    // an already-dry window has no ETA (the depleted/overage moods cover it);
+    // a weekly window only alarms once it's meaningfully underway
+    const underway = key === "f" || (win.pct >= 30);
+    if (bad && underway && typeof o.etaMs === "number" && al[key] !== id) {
       al[key] = id;
       notify(tr(`trend.alarm.${key}`).replace("{eta}", fmtDur(o.etaMs)).replace("{reset}", fmtDur(o.resetMs)));
       sendToWin("sfx", "warn");
@@ -603,23 +608,31 @@ function checkClaudeNotifications(usage) {
   if (pct !== null) prevFiveHourPct = pct;
 
   const wk = usage.week ? usage.week.pct : null;
-  if (prevWeekPct !== null && wk !== null && prevWeekPct >= 50 && wk <= prevWeekPct - 40) {
-    sendToWin("celebrate");
-    sendToWin("sfx", "reset");
+  const wkReset = usage.week ? usage.week.resetsAt || null : null;
+  // a new weekly window: the % dropped like report.js detects it, or the
+  // reset time jumped by more than a day (catches resets the app slept through)
+  const newWeek = (prevWeekPct !== null && wk !== null && wk < prevWeekPct - 15) ||
+    (prevWeekReset && wkReset && Date.parse(wkReset) - Date.parse(prevWeekReset) > 24 * 3600e3);
+  if (newWeek) {
     // 📋 grade the week that just ended (history minus the post-reset sample)
     const rep = reportPayload(settings.history.slice(0, -1));
     if (rep && rep.grade) {
       settings.lastReport = { ...rep, at: Date.now() };
       notify(tr("report.notify").replace("{grade}", rep.grade).replace("{title}", tr("title." + rep.title))
         .replace("{pct}", String(Math.round(rep.usedPct || 0))).replace("{n}", String(rep.depletions)));
-    } else {
-      notify(tr("celebrate.weekReset"));
     }
     const g = garden || G.newGarden();
     settings.weekGarden = { harvested: g.harvested, lost: g.lost, shooed: g.shooed };
+  }
+  if (prevWeekPct !== null && wk !== null && prevWeekPct >= 50 && wk <= prevWeekPct - 40) {
+    // a big reset is worth a party (and waters the garden)
+    sendToWin("celebrate");
+    sendToWin("sfx", "reset");
+    if (!(newWeek && settings.lastReport && Date.now() - settings.lastReport.at < 5000)) notify(tr("celebrate.weekReset"));
     if (garden) { G.water(garden); saveGarden(); }
   }
   if (wk !== null) prevWeekPct = wk;
+  if (wkReset) prevWeekReset = wkReset;
 
   const f = usage.fable ? usage.fable.pct : null;
   if (f !== null && prevFablePct !== null) {

@@ -239,7 +239,7 @@
   function refreshWeather() {
     const tr = usage && usage.trend;
     const wx = tr ? (tr.worst === "w" ? tr.week : tr.five) : null;
-    setWeatherFx(wxEl, wx ? wx.weather : "unknown", () => sfx("thunder"));
+    setWeatherFx(wxEl, wx ? wx.weather : "unknown", () => { if (island.classList.contains("expanded")) sfx("thunder"); });
   }
   api.onSfx((n) => sfx(n));
 

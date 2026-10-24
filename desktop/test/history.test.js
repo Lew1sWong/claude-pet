@@ -69,3 +69,22 @@ test("trendOf picks the worse window and thins the weekly series", () => {
   assert.ok(t.seriesW.length <= 241 && t.seriesW.length > 100);
   assert.ok(t.seriesF.length <= 73);
 });
+
+test("weekly forecast waits for 12 h of post-reset data and averages over whole days", () => {
+  const now = 200 * H1;
+  // reset 30 min ago, climbing 2 %/h since → too early to say anything
+  let s = [];
+  for (let i = 0; i < 300; i++) s = H.pushSample(s, { t: now - (300 - i) * 5 * 60e3, f: 10, w: i < 294 ? 80 : (i - 294) * 0.17 }, now);
+  assert.equal(H.forecast(s, "w", now).rate, null);
+  // two days of a 9-to-5 rhythm (4 %/h at work, flat at night) → ~1.3 %/h, not 4
+  s = [];
+  let w = 0;
+  for (let i = 0; i < 576; i++) {
+    const t = now - (576 - i) * 5 * 60e3;
+    const hod = ((t / H1) % 24 + 24) % 24;
+    if (hod >= 9 && hod < 17) w += 4 / 12;
+    s = H.pushSample(s, { t, f: 10, w }, now);
+  }
+  const fc = H.forecast(s, "w", now);
+  assert.ok(fc.rate > 0.8 && fc.rate < 1.8, "daily-average rate, got " + fc.rate);
+});
