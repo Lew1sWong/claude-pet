@@ -102,5 +102,35 @@
   };
   const EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻" };
 
-  window.GARDEN_SPRITES = { palette: PALETTE, soil: top([]), crops: CROPS, emoji: EMOJI };
+  // 🐦‍⬛ the crow (two frames: wing down / wing up), overlaid on a ripe plot
+  PALETTE.n = "#14141c";   // feathers
+  PALETTE.e = "#ffffff";   // eye
+  const CROW = [
+    [
+      EMPTY,
+      "......nn........",
+      ".....nenn.......",
+      ".....nnnnyy.....",
+      "....nnnnnn......",
+      "..nnnnnnnn......",
+      "...nnnnnnn......",
+      "....nnnnn.......",
+      ".....n.n........",
+      EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
+    ],
+    [
+      "...n............",
+      "...nn.nn........",
+      "....nnenn.......",
+      ".....nnnnyy.....",
+      "....nnnnnn......",
+      "....nnnnnn......",
+      "...nnnnnnn......",
+      "....nnnnn.......",
+      ".....n.n........",
+      EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
+    ],
+  ];
+
+  window.GARDEN_SPRITES = { palette: PALETTE, soil: top([]), crops: CROPS, emoji: EMOJI, crow: CROW };
 })();

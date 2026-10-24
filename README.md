@@ -74,6 +74,13 @@ Claude's usage API (as of Oct 2026) reports a structured list of limits instead 
 - **Pixel garden** — three plots live under the usage bars (and in the Dynamic Island's lower area). Click an empty plot to plant; carrots 🥕, tomatoes 🍅 and sunflowers 🌻 grow at the pace of the pet's mood: a happy, well-rationed Claude means a thriving garden, burning through the quota stalls it, and a depleted quota leaves the plants thirsty 💧. Every reset waters them. Ripe crops glow — click to harvest and feed the pet (10 harvests unlock the 🌱 *Harvest Master* medal). Toggle it in Settings → Features.
 - **Trend sparklines + forecast** — the HUD keeps 7 days of history and draws two 8-bit sparklines (5h window over 6 hours, weekly over 7 days). A burn-rate forecast tells you whether you'll make it to the reset at the current pace: ☀️ fine · 🌤 tight · 🌧 runs dry before the reset · ⛈ running dry fast — and the pet nags you about the pace when it turns bad.
 
+### 🐦‍⬛ The crow, ⛈ live weather, 📋 report cards
+
+- **The crow** — leave a ripe crop unharvested for 8 hours (while the app is running) and a crow lands on it; ignore it for 4 more and it flies off with your crop. Click the crow to shoo it (10 shoos → 🐦‍⬛ *Scarecrow* medal).
+- **Live quota weather** — the forecast gets visuals: pixel rain over the HUD when you're going to run dry before the reset, lightning (and thunder, if sounds are on) when it's happening fast, sparkles when you're fine. A **pace alarm** notification fires once per window when the forecast turns bad.
+- **Weekly report card** — 📋 in the HUD: grade S/A/B/C, a title (Token Furnace, Night Owl, Weekend Warrior, Zen Master, Monday Sprinter, Pace Master, Green Thumb, Steady Hand), your heaviest day, late-night share, garden stats and tips. Every weekly reset grades the finished week and pushes the result.
+- **8-bit sounds** (off by default) and **context-aware quips** (late nights, Mondays, weekends, Fable-heavy weeks…).
+
 ### Track OTHER agents too (Codex / OpenClaw 🦞 / anything)
 
 Claude isn't the only thing burning tokens. In **Settings → Usage sources** you can enable:
@@ -213,6 +220,13 @@ Claude 的用量接口（2026 年 10 月起）返回的是一张结构化的额�
 
 - **像素菜园** —— 用量条下面（灵动岛则在展开面板的下半区）有三块小地。点空地播种，胡萝卜 🥕、番茄 🍅、向日葵 🌻 会按宠物的心情长：额度省着用、宠物开心，菜就长得快；额度烧得猛就停滞；额度耗尽时菜会口渴 💧 蔫掉。每次额度重置都会给菜园浇水。成熟的作物会发光，点一下就收获喂给宠物（收获 10 次解锁 🌱「丰收达人」勋章）。可在 设置 → 功能 里关掉。
 - **趋势折线 + 预测** —— 面板保存 7 天用量历史，画两条 8-bit 折线（5h 窗口看最近 6 小时，周窗口看 7 天）。按当前消耗速度预测能不能撑到重置：☀️ 稳 · 🌤 刚好 · 🌧 重置前就会用完 · ⛈ 烧得太快 —— 天气变差时宠物还会碎碎念提醒你悠着点。
+
+### 🐦‍⬛ 乌鸦、⛈ 真·天气、📋 成绩单
+
+- **乌鸦偷菜** —— 成熟的菜放 8 小时不收（只算 App 开着的时间），乌鸦会落在上面；再放 4 小时就被叼走。点乌鸦赶跑它（赶 10 次解锁 🐦‍⬛「稻草人」勋章）。
+- **真·额度天气** —— 预测有了画面：预计重置前会用光时面板里下像素雨，烧得太快时电闪雷鸣（开音效还有雷声），稳的时候飘小星星。天气变差时每个窗口推送一次**预警通知**。
+- **每周成绩单** —— 面板上的 📋：S/A/B/C 评级 + 称号（烧 token 狂魔 / 夜猫子 / 周末战士 / 佛系用户 / 周一冲刺手 / 节奏大师 / 种田能手 / 稳健开发者）、最猛的一天、深夜占比、菜园战绩和小建议。每周重置时自动给上一周打分并推送。
+- **8-bit 音效**（默认关）和**看场合吐槽**的宠物（深夜、周一、周末、Fable 烧得猛……）。
 
 ### 也能追踪其他 Agent 的用量（Codex / OpenClaw 龙虾 🦞 / 任意工具）
 

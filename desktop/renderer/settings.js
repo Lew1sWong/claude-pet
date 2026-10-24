@@ -18,6 +18,7 @@
       games: $("feat-games").checked,
       boss: $("feat-boss").checked,
       garden: $("feat-garden").checked,
+      sound: $("feat-sound").checked,
     };
   }
 
@@ -245,6 +246,7 @@
       { cls: "m-boss", emoji: "🕶️", count: stats.bossUses || 0, titleKey: "ach.boss.title", descKey: "ach.boss.desc" },
       { cls: "m-game", emoji: "🎮", count: stats.gameClears || 0, titleKey: "ach.game.title", descKey: "ach.game.desc" },
       { cls: "m-harvest", emoji: "🌱", count: stats.harvests || 0, titleKey: "ach.harvest.title", descKey: "ach.harvest.desc" },
+      { cls: "m-crow", emoji: "🐦‍⬛", count: stats.shoos || 0, titleKey: "ach.crow.title", descKey: "ach.crow.desc" },
     ];
     defs.forEach((d) => {
       const unlocked = d.count >= goal;
@@ -275,6 +277,7 @@
     $("feat-games").checked = d.settings.features.games;
     $("feat-boss").checked = d.settings.features.boss;
     $("feat-garden").checked = d.settings.features.garden !== false;
+    $("feat-sound").checked = !!d.settings.features.sound;
     const prov = d.settings.providers || {};
     $("prov-claude").checked = prov.claude !== false;
     $("prov-codex").checked = !!prov.codex;
@@ -307,7 +310,7 @@
   wireSeg("prof-seg", "profession");
   wireSeg("size-seg", "petSize", (v) => Number(v));
 
-  ["feat-usage", "feat-games", "feat-boss", "feat-garden"].forEach((id) =>
+  ["feat-usage", "feat-games", "feat-boss", "feat-garden", "feat-sound"].forEach((id) =>
     $(id).addEventListener("change", () => { patch({ features: featuresNow() }); updateConditional(); }));
   ["prov-claude", "prov-codex", "prov-openclaw", "prov-custom"].forEach((id) =>
     $(id).addEventListener("change", () => { patch({ providers: providersNow() }); updateConditional(); }));

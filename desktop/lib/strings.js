@@ -72,6 +72,48 @@ const zh = {
   "ach.harvest.title": "丰收达人",
   "ach.harvest.desc": "收获 10 次作物",
 
+  // ⛈ 预警（预测会在重置前用光，每个窗口只提醒一次）
+  "trend.alarm.f": "⛈ 照这速度 5h 额度 {eta} 后见底，离重置还有 {reset}",
+  "trend.alarm.w": "🌧 照这速度周额度 {eta} 后用完，离重置还有 {reset}",
+
+  // 🐦‍⬛ 乌鸦偷菜
+  "garden.crow": "🐦‍⬛ 乌鸦盯上了{crop}！点击赶走",
+  "garden.shooed": "🐦‍⬛💨 赶跑了！",
+  "crow.notify": "🐦‍⬛ 乌鸦盯上了你的{crop}！快去赶走它",
+  "crow.lost": "🐦‍⬛ 你的{crop}被乌鸦叼走了…下次早点收",
+  "ach.crow.title": "稻草人",
+  "ach.crow.desc": "赶走乌鸦 10 次",
+
+  // 🔊 音效
+  "set.featSound": "8-bit 音效",
+  "set.featSoundSub": "收获、重置、乌鸦叫、雷声…（默认关）",
+
+  // 📋 每周成绩单
+  "tip.report": "本周成绩单",
+  "report.title": "📋 本周成绩单",
+  "report.used": "本周已用 {pct}%",
+  "report.depletions": "见底 {n} 次 · 险些 {m} 次",
+  "report.peak": "最猛的一天：{day}",
+  "report.late": "深夜占比 {pct}%",
+  "report.garden": "🧺 收获 {h} · 🐦‍⬛ 被偷 {l} · 赶鸟 {s}",
+  "report.empty": "数据还不够，到周末再来看看",
+  "report.last": "上周：{grade} · {title}",
+  "report.notify": "📋 本周成绩单：{grade} 级「{title}」· 用了 {pct}% · 见底 {n} 次",
+  "title.furnace": "烧 token 狂魔",
+  "title.owl": "夜猫子",
+  "title.weekend": "周末战士",
+  "title.zen": "佛系用户",
+  "title.mondayRush": "周一冲刺手",
+  "title.pace": "节奏大师",
+  "title.farmer": "种田能手",
+  "title.steady": "稳健开发者",
+  "tip.depleted": "试试把大任务拆开，错开 5 小时窗口",
+  "tip.owl": "深夜的 token 最贵——那是睡眠换的",
+  "tip.crow": "成熟的菜记得收，乌鸦可不客气",
+  "tip.spread": "用量集中在一两天，匀开会更稳",
+  "tip.zen": "额度还剩很多，大胆用",
+  "day.0": "周日", "day.1": "周一", "day.2": "周二", "day.3": "周三", "day.4": "周四", "day.5": "周五", "day.6": "周六",
+
   // extra usage（额外用量 / 用量积分）提醒
   "extra.on": "💸 计划额度用完了，已开始消耗额外用量",
   "extra.warn80": "💸 额外用量已到月上限的 {pct}%，留意账单哦",
@@ -250,6 +292,44 @@ const en = {
   "ach.harvest.title": "Harvest Master",
   "ach.harvest.desc": "Harvest 10 crops",
 
+  "trend.alarm.f": "⛈ At this pace the 5h window is dry in {eta}; the reset is {reset} away",
+  "trend.alarm.w": "🌧 At this pace the weekly window is dry in {eta}; the reset is {reset} away",
+
+  "garden.crow": "🐦‍⬛ A crow is on your {crop}! Click to shoo it",
+  "garden.shooed": "🐦‍⬛💨 Shooed!",
+  "crow.notify": "🐦‍⬛ A crow is eyeing your {crop} — shoo it away!",
+  "crow.lost": "🐦‍⬛ The crow flew off with your {crop}… harvest sooner next time",
+  "ach.crow.title": "Scarecrow",
+  "ach.crow.desc": "Shoo the crow 10×",
+
+  "set.featSound": "8-bit sounds",
+  "set.featSoundSub": "Harvests, resets, crow caws, thunder… (off by default)",
+
+  "tip.report": "Weekly report card",
+  "report.title": "📋 Weekly report card",
+  "report.used": "Used {pct}% of the week",
+  "report.depletions": "Dry {n}× · close calls {m}×",
+  "report.peak": "Heaviest day: {day}",
+  "report.late": "Late-night share {pct}%",
+  "report.garden": "🧺 harvested {h} · 🐦‍⬛ stolen {l} · shooed {s}",
+  "report.empty": "Not enough data yet — check back later in the week",
+  "report.last": "Last week: {grade} · {title}",
+  "report.notify": "📋 Weekly report: {grade} “{title}” · used {pct}% · dry {n}×",
+  "title.furnace": "Token Furnace",
+  "title.owl": "Night Owl",
+  "title.weekend": "Weekend Warrior",
+  "title.zen": "Zen Master",
+  "title.mondayRush": "Monday Sprinter",
+  "title.pace": "Pace Master",
+  "title.farmer": "Green Thumb",
+  "title.steady": "Steady Hand",
+  "tip.depleted": "Split big tasks across 5-hour windows",
+  "tip.owl": "Late-night tokens are the priciest — they're paid in sleep",
+  "tip.crow": "Harvest ripe crops — the crow won't wait",
+  "tip.spread": "Usage piles up on a day or two — spread it out",
+  "tip.zen": "Plenty left — go wild",
+  "day.0": "Sun", "day.1": "Mon", "day.2": "Tue", "day.3": "Wed", "day.4": "Thu", "day.5": "Fri", "day.6": "Sat",
+
   "extra.on": "💸 Plan limits hit — now using usage credits",
   "extra.warn80": "💸 Usage credits at {pct}% of the monthly spend limit — mind the bill",
   "extra.warn95": "‼️ Usage credits at {pct}% — about to hit the spend limit!",
@@ -395,6 +475,15 @@ const lines = {
       storm: ["⛈ 慢点慢点! 这速度今晚要饿肚子", "额度在狂泻… 💦"],
     },
     harvest: ["啊呜~ 自己种的最香!", "咔嚓咔嚓~ 新鲜!", "谢谢你照顾菜园 ❤"],
+    context: {
+      lateNight: ["凌晨了还在 vibe coding? 早点睡~", "夜深了, token 和你都该休息", "再写一会儿就去睡, 说好的"],
+      monday: ["周一快乐! 额度也是新的~", "新的一周, 先喝口水", "周一的 bug 格外多, 慢慢来"],
+      friday: ["周五啦, 别把周额度留到周末烧", "今天写完就休息吧~"],
+      weekend: ["周末也在写代码? 敬业!", "周末的 token 格外香", "出去走走? 我在这看家"],
+      fableHeavy: ["Fable 烧得真香~ 钱包还好吗", "✦ 又在用最贵的模型啦", "Fable 一次, 我少吃三顿"],
+      coworkHeavy: ["Cowork 用得挺勤快嘛", "让 Cowork 干活, 你摸鱼?", "Cowork 都快成本周主力了"],
+      codeHeavy: ["今天全泡在 Claude Code 里~", "命令行战士, 冲!"],
+    },
   },
   en: {
     click: {
@@ -435,6 +524,15 @@ const lines = {
       storm: ["⛈ slow down! we'll starve tonight", "the quota's pouring out… 💦"],
     },
     harvest: ["nom~ home-grown is the best!", "crunch crunch~ so fresh!", "thanks for tending the garden ❤"],
+    context: {
+      lateNight: ["vibe coding past midnight? go to bed~", "it's late — tokens and you both need rest", "one more prompt, then sleep. promise?"],
+      monday: ["happy Monday! fresh quota too~", "new week — water first", "Monday bugs are extra spicy, take it slow"],
+      friday: ["it's Friday — don't torch the weekly quota on the weekend", "ship it and rest~"],
+      weekend: ["coding on the weekend? dedicated!", "weekend tokens taste extra good", "go outside? I'll guard the place"],
+      fableHeavy: ["Fable burns bright~ how's the wallet", "✦ on the priciest model again", "one Fable call = three of my meals"],
+      coworkHeavy: ["Cowork's been busy, huh", "letting Cowork work while you slack?", "Cowork's basically the MVP this week"],
+      codeHeavy: ["living in Claude Code today~", "terminal warrior, charge!"],
+    },
   },
 };
 

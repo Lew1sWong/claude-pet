@@ -28,6 +28,8 @@
   const breakdownEl = document.getElementById("breakdown");
   const trendEl = document.getElementById("trend");
   const gardenEl = document.getElementById("garden");
+  const reportEl = document.getElementById("report-card");
+  const wxEl = document.getElementById("wx");
   const othersEl = document.getElementById("others");
 
   // ------------------------------------------------------------- state
@@ -110,14 +112,41 @@
     storm: ["⛈ 慢点慢点! 这速度今晚要饿肚子", "额度在狂泻… 💦"],
   };
   let HARVEST_LINES = ["啊呜~ 自己种的最香!", "咔嚓咔嚓~ 新鲜!", "谢谢你照顾菜园 ❤"];
+  let CONTEXT_LINES = {
+    lateNight: ["凌晨了还在 vibe coding? 早点睡~", "夜深了, token 和你都该休息"],
+    monday: ["周一快乐! 额度也是新的~"], friday: ["周五啦, 别把周额度留到周末烧"],
+    weekend: ["周末也在写代码? 敬业!"], fableHeavy: ["Fable 烧得真香~ 钱包还好吗"],
+    coworkHeavy: ["Cowork 用得挺勤快嘛"], codeHeavy: ["今天全泡在 Claude Code 里~"],
+  };
+  // what's going on right now (time of day / weekday / what's burning) → a
+  // matching line pool, or null when nothing special is happening
+  function contextPool() {
+    const now = new Date();
+    const h = now.getHours(), d = now.getDay();
+    const c = [];
+    if (h < 5) c.push("lateNight");
+    if (d === 1 && h < 12) c.push("monday");
+    if (d === 5 && h >= 15) c.push("friday");
+    if (d === 0 || d === 6) c.push("weekend");
+    const rows = usage && usage.breakdown && usage.breakdown.rows;
+    if (rows) {
+      const pct = (k) => ((rows.find((r) => r.key === k) || {}).pct || 0);
+      if (pct("cowork") >= 40) c.push("coworkHeavy");
+      if (pct("claude_code") >= 85) c.push("codeHeavy");
+    }
+    if (usage && usage.fable && usage.fable.pct >= 50) c.push("fableHeavy");
+    const k = c[Math.floor(Math.random() * c.length)];
+    return k && CONTEXT_LINES[k] && CONTEXT_LINES[k].length ? CONTEXT_LINES[k] : null;
+  }
 
   // ------------------------------------------------------------- pet brain
   // shared, kept identical between the floating pet and the Dynamic Island
   const {
     computeMode, fmtCd, drawPet, frameCount, mergeCustomPets,
     renderOthers, renderScoped, renderExtra, renderBreakdown, renderTrend, renderGarden,
-    blockingWindow, lockedReason,
+    setWeatherFx, renderReport, blockingWindow, lockedReason,
   } = window.PetCore;
+  const sfx = (n) => { if (window.SFX) window.SFX.play(n); };
 
   function drawFrame(t) {
     const begging = t < begUntil;
@@ -233,6 +262,8 @@
     renderBreakdown(breakdownEl, usage);
     renderTrend(trendEl, usage);
     refreshGarden();
+    refreshReport();
+    refreshWeather();
     renderOthers(othersEl, usage && usage.others);
     nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
 
@@ -295,18 +326,22 @@
   let lastHarvestAt = 0;
   const CROP_EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻" };
   function onPlot(i, plot) {
-    if (!plot) api.gardenPlant(i, null);
+    if (plot && plot.crow) { api.gardenShoo(i); return; }          // 🐦‍⬛ shoo first
+    if (!plot) { api.gardenPlant(i, null); sfx("plant"); }
     else if (plot.progress >= 1) api.gardenHarvest(i);
     else sayTemp((plot.wilt >= 0.5 ? t("garden.thirsty") : t("garden.growing"))
       .replace("{crop}", t("crop." + plot.crop)).replace("{pct}", String(Math.round(plot.progress * 100))), 2000);
   }
   function celebrateHarvest(crop) {
+    sfx("harvest");
     sayTemp(HARVEST_LINES[Math.floor(Math.random() * HARVEST_LINES.length)], 2600);
     celebrateUntil = performance.now() + 1500;
     let n = 0;
     const tk = setInterval(() => { spawnFx(n % 2 ? "♥" : (CROP_EMOJI[crop] || "🌱")); if (++n > 4) clearInterval(tk); }, 220);
   }
   function refreshGarden() { renderGarden(gardenEl, gardenOn ? garden : null, onPlot); }
+  let lastShooed = -1;
+  let lastLossAt = 0;
   api.onGarden((g) => {
     garden = g;
     const h = g && g.lastHarvest;
@@ -314,8 +349,33 @@
       if (lastHarvestAt) celebrateHarvest(h.crop);   // not on the initial load
       lastHarvestAt = h.at;
     }
+    const shooed = g ? g.shooed || 0 : 0;
+    if (lastShooed >= 0 && shooed > lastShooed) { sfx("shoo"); sayTemp(t("garden.shooed"), 1800); spawnFx("🐦‍⬛"); spawnFx("💨"); }
+    lastShooed = shooed;
+    const loss = g && g.lastLoss;
+    if (loss && loss.at && loss.at !== lastLossAt) {
+      if (lastLossAt) { sayTemp(t("crow.lost").replace("{crop}", t("crop." + loss.crop)), 3000); spawnFx("🐦‍⬛"); }
+      lastLossAt = loss.at;
+    }
     refreshGarden();
   });
+  // 📋 weekly report card (toggle with the button; auto-opens when a new
+  // week was just graded)
+  let reportOpen = false;
+  let lastReportAt = 0;
+  function refreshReport() {
+    reportEl.classList.toggle("hidden", !reportOpen);
+    reportEl.parentElement.classList.toggle("report-mode", reportOpen);
+    if (reportOpen) renderReport(reportEl, usage && usage.report, usage && usage.lastReport);
+  }
+  document.getElementById("report").addEventListener("click", () => { reportOpen = !reportOpen; sfx("click"); refreshReport(); });
+  // ⛈ live weather on the overlay canvas, driven by the forecast
+  function refreshWeather() {
+    const tr = usage && usage.trend;
+    const wx = tr ? (tr.worst === "w" ? tr.week : tr.five) : null;
+    setWeatherFx(wxEl, wx ? wx.weather : "unknown", () => sfx("thunder"));
+  }
+  api.onSfx((n) => sfx(n));
 
   function applyState() {
     const prev = mode;
@@ -447,6 +507,7 @@
       const tr = usage && usage.trend;
       const wx = tr && (tr.worst === "w" ? tr.week : tr.five);
       if (wx && WEATHER_LINES[wx.weather] && Math.random() < 0.5) pool = WEATHER_LINES[wx.weather];
+      else if (Math.random() < 0.45) { const cp = contextPool(); if (cp) pool = cp; }
       sayTemp(pool[Math.floor(Math.random() * pool.length)], 2800);
     }
     nextQuip = t + 70000 + Math.random() * 170000;
@@ -475,7 +536,16 @@
   document.getElementById("game").addEventListener("click", () => { if (window.PetGames) window.PetGames.open(); });
 
   // ------------------------------------------------------------- host events
-  api.onUsage((d) => { usage = d; errorCode = null; applyState(); });
+  api.onUsage((d) => {
+    usage = d; errorCode = null;
+    // a freshly graded week → pop the card open and keep the HUD up a while
+    const lr = d && d.lastReport;
+    if (lr && lr.at && lr.at !== lastReportAt) {
+      if (lastReportAt) { reportOpen = true; showHud(); clearTimeout(hudHide); hudHide = setTimeout(() => hud.classList.add("hidden"), 9000); }
+      lastReportAt = lr.at;
+    }
+    applyState();
+  });
   api.onError((d) => {
     errorCode = (d && d.code) || "fetch";
     errorDetail = (d && d.message) || "";
@@ -518,6 +588,7 @@
       if (d.lines.buddy) BUDDY_LINES = d.lines.buddy;
       if (d.lines.weather) WEATHER_LINES = d.lines.weather;
       if (d.lines.harvest) HARVEST_LINES = d.lines.harvest;
+      if (d.lines.context) CONTEXT_LINES = d.lines.context;
     }
     if (window.applyI18n) window.applyI18n();
     refreshHud(); refreshBubble();
@@ -526,6 +597,7 @@
     const g = document.getElementById("game");
     if (g) g.style.display = (f && f.games) ? "" : "none";
     gardenOn = !(f && f.garden === false);
+    if (window.SFX) window.SFX.setEnabled(!!(f && f.sound));
     refreshGarden();
   });
 
@@ -536,6 +608,8 @@
       renderScoped(scopedEl, usage);
       renderExtra(extraEl, usage);
     }
+    // 🐦‍⬛ keep the crow flapping while it's around
+    if (garden && garden.plots && garden.plots.some((p) => p && p.crow)) refreshGarden();
   }, 1000);
 
   refreshHud();

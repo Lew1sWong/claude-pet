@@ -126,3 +126,10 @@ footer { padding-top: 16px; }
   background: radial-gradient(circle at 50% 32%, #d6f5c9, #4caf50 72%);
   box-shadow: 0 0 16px rgba(92, 191, 95, .55);
 }
+
+/* 🐦‍⬛ scarecrow medal */
+.medal.unlocked.m-crow .badge {
+  border-color: #9fb4ff;
+  background: radial-gradient(circle at 50% 32%, #dfe6ff, #5a6fd6 72%);
+  box-shadow: 0 0 16px rgba(120, 140, 230, .55);
+}
