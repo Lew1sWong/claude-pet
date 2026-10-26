@@ -19,7 +19,7 @@
   <div id="app">
     <header id="topbar">
       <span class="brand">🐾 Claude Pet</span>
-      <button id="gear" class="icon-btn" title="设置" aria-label="设置">⚙</button>
+      <button id="gear" class="icon-btn" data-w-title="set.title" title="设置" aria-label="设置">⚙</button>
     </header>
 
     <!-- the pet lives and walks in here -->
@@ -27,38 +27,47 @@
       <canvas id="pet" width="16" height="16"></canvas>
       <div id="bubble" class="hidden"></div>
       <div id="ground"></div>
-      <div id="demo-tag" class="hidden">演示模式</div>
+      <div id="demo-tag" class="hidden" data-w="demoTag">演示模式</div>
     </div>
 
     <!-- usage + controls -->
     <section id="panel">
+      <canvas id="wx" class="wx hidden"></canvas>
       <div class="name-row">
-        <button id="prev" class="pix-btn" aria-label="上一只">◀</button>
+        <button id="prev" class="pix-btn" data-i18n-title="tip.prev" aria-label="上一只">◀</button>
         <span id="pet-name">…</span>
-        <button id="next" class="pix-btn" aria-label="下一只">▶</button>
+        <button id="next" class="pix-btn" data-i18n-title="tip.next" aria-label="下一只">▶</button>
+        <span class="spacer"></span>
+        <button id="report" class="pix-btn" data-i18n-title="tip.report" aria-label="成绩单">📋</button>
       </div>
+
+      <div id="report-card" class="report-card hidden"></div>
 
       <div class="bar-row"><span class="bar-label">5H</span>
         <div class="bar"><div id="bar5" class="bar-fill"></div></div>
         <span id="pct5" class="bar-pct">--%</span></div>
       <div id="reset5" class="reset-line"></div>
 
-      <div class="bar-row"><span class="bar-label">周</span>
+      <div class="bar-row"><span class="bar-label" data-i18n="hud.week">周</span>
         <div class="bar"><div id="barw" class="bar-fill"></div></div>
         <span id="pctw" class="bar-pct">--%</span></div>
       <div id="resetw" class="reset-line"></div>
 
-      <!-- model-scoped weekly limits (Fable ✦ …) / extra usage / where the week went -->
+      <!-- model-scoped weekly limits (Fable ✦ …) / usage credits / where the week went -->
       <div id="scoped"></div>
       <div id="extra" class="hidden"></div>
       <div id="breakdown" class="breakdown hidden"></div>
+      <!-- 📈 trend sparklines + quota weather · 🌱 pixel garden -->
+      <div id="trend" class="trend hidden"></div>
+      <div id="garden" class="garden hidden"></div>
+      <div id="others"></div>
 
       <div id="msg" class="hidden"></div>
 
       <div class="action-row">
-        <button id="feed" class="pix-btn wide">🍖 投喂</button>
-        <button id="pause" class="pix-btn wide">⏸ 休息</button>
-        <button id="refresh" class="pix-btn wide">↻ 刷新</button>
+        <button id="feed" class="pix-btn wide" data-w="btn.feed">🍖 投喂</button>
+        <button id="pause" class="pix-btn wide" data-w="btn.pause">⏸ 休息</button>
+        <button id="refresh" class="pix-btn wide" data-w="btn.refresh">↻ 刷新</button>
       </div>
     </section>
 
@@ -67,51 +76,79 @@
     </footer>
   </div>
 
+  <div id="toast" class="toast hidden"></div>
+
   <!-- settings -->
   <div id="overlay" class="hidden">
     <div id="settings" role="dialog" aria-label="设置">
-      <h2>设置</h2>
+      <h2 data-w="set.title">设置</h2>
 
       <label class="field">
-        <span>Claude OAuth Token<small>（可选，自动获取实时用量）</small></span>
-        <textarea id="f-token" rows="3" placeholder="sk-ant-oat... 或 OAuth access token" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+        <span><span data-w="set.token">Claude OAuth Token</span><small data-w="set.tokenSub">（可选，自动获取实时用量）</small></span>
+        <textarea id="f-token" rows="3" placeholder="sk-ant-oat... / OAuth access token" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
       </label>
 
       <label class="field">
-        <span>代理 / 中转地址<small>（可选，绕过浏览器 CORS）</small></span>
-        <input id="f-proxy" type="url" inputmode="url" placeholder="https://你的中转/api/oauth/usage" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <span><span data-w="set.proxy">代理 / 中转地址</span><small data-w="set.proxySub">（可选，绕过浏览器 CORS）</small></span>
+        <input id="f-proxy" type="url" inputmode="url" placeholder="https://your-relay/api/oauth/usage" autocomplete="off" autocapitalize="off" spellcheck="false">
       </label>
 
       <div class="manual-row">
         <label class="field half">
-          <span>手动 5H %</span>
-          <input id="f-five" type="number" min="0" max="100" inputmode="numeric" placeholder="如 40">
+          <span data-w="set.manual5">手动 5H %</span>
+          <input id="f-five" type="number" min="0" max="100" inputmode="numeric" placeholder="40">
         </label>
         <label class="field half">
-          <span>手动 周 %</span>
-          <input id="f-week" type="number" min="0" max="100" inputmode="numeric" placeholder="如 55">
+          <span data-w="set.manualW">手动 周 %</span>
+          <input id="f-week" type="number" min="0" max="100" inputmode="numeric" placeholder="55">
         </label>
         <label class="field half">
-          <span>手动 Fable ✦ %</span>
-          <input id="f-fable" type="number" min="0" max="100" inputmode="numeric" placeholder="可选">
+          <span data-w="set.manualF">手动 Fable ✦ %</span>
+          <input id="f-fable" type="number" min="0" max="100" inputmode="numeric" placeholder="–">
+        </label>
+      </div>
+
+      <div class="manual-row">
+        <label class="field half">
+          <span data-i18n="set.language">语言</span>
+          <select id="f-lang">
+            <option value="system" data-i18n="set.followSystem">跟随系统</option>
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <label class="field half check">
+          <input id="f-sound" type="checkbox"> <span data-i18n="set.featSound">8-bit 音效</span>
+        </label>
+        <label class="field half check">
+          <input id="f-notify" type="checkbox"> <span data-w="set.notify">系统通知</span>
         </label>
       </div>
 
       <p class="hint" id="settings-status"></p>
-      <p class="hint dim">
+      <p class="hint dim" data-w="set.help">
         手机浏览器直接调用 Anthropic 接口通常会被 CORS 拦截。最稳的方式是填「手动 %」让宠物反映你的状态；
         想自动获取就配一个中转地址（详见 README）。Token 只存在本机浏览器，不上传。
       </p>
 
       <div class="settings-actions">
-        <button id="s-test" class="pix-btn">测试自动获取</button>
-        <button id="s-clear" class="pix-btn">清空</button>
-        <button id="s-save" class="pix-btn primary">保存</button>
+        <button id="s-test" class="pix-btn" data-w="set.test">测试自动获取</button>
+        <button id="s-clear" class="pix-btn" data-w="set.clear">清空</button>
+        <button id="s-save" class="pix-btn primary" data-w="set.save">保存</button>
       </div>
     </div>
   </div>
 
+  <!-- shared modules generated from desktop/ by `npm run sync-web` (same parser, mood, garden, forecast, report, strings, sprites, sfx, renderer helpers) -->
+  <script src="shared/strings.js"></script>
+  <script src="shared/usageClient.js"></script>
+  <script src="shared/history.js"></script>
+  <script src="shared/garden.js"></script>
+  <script src="shared/report.js"></script>
   <script src="sprites.js"></script>
+  <script src="shared/gardensprites.js"></script>
+  <script src="shared/sfx.js"></script>
+  <script src="shared/petcore.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

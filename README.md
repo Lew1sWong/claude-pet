@@ -30,7 +30,7 @@ Claude Pet keeps a tiny pixel companion on your screen. It reads your local Clau
 It comes in two flavours:
 
 - **Desktop** ([`desktop/`](desktop/)) — a transparent, always-on-top, click-through floating pet for **macOS & Windows** (Electron).
-- **Mobile / Web** ([`web/`](web/)) — the same pets as an installable **PWA** for your phone.
+- **Mobile / Web** ([`web/`](web/)) — the same pets as an installable **PWA** for your phone, running the same shared modules (garden, crow, trend, weather, report cards, zh/en).
 
 ### Desktop — quick start (needs [Node.js](https://nodejs.org) 22+; macOS 13+ or Windows 10/11 x64)
 
@@ -123,6 +123,8 @@ On your phone (same Wi-Fi) open `http://<your-computer-ip>:8099`, then:
 - **iPhone (Safari)**: Share → *Add to Home Screen*
 - **Android (Chrome)**: menu → *Add to Home Screen*
 
+The phone gets the whole feature set — usage rows, 📈 sparklines and ⛈ weather, 🌱 garden with the 🐦‍⬛ crow, 📋 report cards, sounds, zh/en, optional system notifications — from modules generated out of `desktop/` (`cd desktop && npm run sync-web`), so the two never drift.
+
 **Where does the phone get data?** (tap ⚙) Phones have no local Claude credentials, and browsers usually get **CORS-blocked** calling Anthropic directly, so there are three options:
 1. **Manual %** *(most reliable)* — read your current 5h / weekly % (and optionally the Fable ✦ %) from `claude`'s `/usage` and type them in.
 2. **Proxy URL** — point it at a small relay (e.g. a Cloudflare Worker) that forwards the request and adds CORS headers, then it fetches live data.
@@ -177,7 +179,7 @@ Claude Pet 在你屏幕上养一只像素小宠物。它只读本机的 Claude C
 提供两种形态：
 
 - **桌面版** ([`desktop/`](desktop/)) —— 透明、置顶、点击穿透的悬浮桌宠，支持 **macOS 和 Windows**（Electron）。
-- **手机 / 网页版** ([`web/`](web/)) —— 同款宠物做成可装进手机主屏幕的 **PWA**。
+- **手机 / 网页版** ([`web/`](web/)) —— 同款宠物做成可装进手机主屏幕的 **PWA**，跑的是同一套共享模块（菜园、乌鸦、趋势、天气、成绩单、中英文）。
 
 ### 桌面版 —— 快速开始（需要 [Node.js](https://nodejs.org) 22+；macOS 13+ 或 Windows 10/11 x64）
 
@@ -269,6 +271,8 @@ python3 -m http.server 8099      # 或：npx serve .
 手机连同一个 Wi-Fi，浏览器打开 `http://<电脑IP>:8099`，然后：
 - **iPhone（Safari）**：分享 →「添加到主屏幕」
 - **Android（Chrome）**：菜单 →「添加到主屏幕」
+
+手机版的功能和桌面版一样全——用量条、📈 折线和 ⛈ 天气、🌱 菜园和 🐦‍⬛ 乌鸦、📋 成绩单、音效、中英文、可选的系统通知——因为代码就是从 `desktop/` 生成的（`cd desktop && npm run sync-web`），两边不会跑偏。
 
 **手机怎么拿数据？**（点 ⚙）手机上没有本机 Claude 凭证，而且浏览器直连 Anthropic 接口通常会被 **CORS 拦截**，所以有三档：
 1. **手动 %**（最稳，推荐）—— 在电脑用 `claude` 的 `/usage` 看一眼当前 5h / 周百分比（Fable ✦ 可选）填进去。

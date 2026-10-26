@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.0 — 2026-10-26 · "手机版补齐"
+
+### 📱 Web / PWA parity
+- The PWA now runs the **same code** as the desktop app: `desktop/scripts/sync-web.js`
+  (`npm run sync-web`) generates `web/shared/*.js` from the desktop modules —
+  usage parser + mood, history & forecast, garden + crow, weekly report
+  card, zh/en strings, sprites, the 8-bit synth and the HUD renderers. A test
+  fails when the generated files are stale. `web/app.js` is page glue only.
+- Everything the desktop got in 0.3.0 / 0.4.0 is on the phone: scoped-limit
+  and usage-credit rows, the weekly breakdown, 📈 sparklines + ⛈ quota
+  weather with pixel rain and lightning, pace alarms, 🌱 garden with the
+  🐦‍⬛ crow, 📋 report cards with titles (graded at the weekly reset),
+  context-aware quips, yawn/stretch micro-animations.
+- New in Settings: language (follow system / 中文 / English), 8-bit sounds,
+  and opt-in system notifications (crow, losses, alarms, resets, report
+  cards — delivered when the tab is in the background).
+- Demo mode ships a two-day synthetic history so the sparklines, weather and
+  report card show without any setup. Service-worker cache bumped (v4).
+
 ## 0.4.0 — 2026-10-24 · "乌鸦、天气和成绩单"
 
 ### 🐦‍⬛ The crow

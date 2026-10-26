@@ -206,6 +206,9 @@ function saveGarden() {
   settings.garden = garden;
   saveSettings();
   sendToWin("garden", gardenPayload());
+  // the report card counts harvests / losses / shoos — refresh it right away
+  // instead of waiting for the next poll
+  if (lastUsage) sendToWin("usage", { ...usagePayload(lastUsage), fetchedAt: settings.lastUsageAt || Date.now() });
 }
 // usage + the trend computed from the persisted history, as the renderer expects it
 function usagePayload(u) {
