@@ -67,6 +67,13 @@ const zh = {
   "crop.carrot": "胡萝卜",
   "crop.tomato": "番茄",
   "crop.sunflower": "向日葵",
+  "crop.pumpkin": "南瓜",
+
+  // 🎃🎄🎆🧧 应季彩蛋（每个节日问候一次）
+  "season.halloween": "🎃 万圣节快乐！今晚的 token 有点阴森…菜园里能种南瓜啦",
+  "season.christmas": "🎄 圣诞快乐！额度也要暖暖的",
+  "season.newyear": "🎆 新年快乐！新的一年，新的额度",
+  "season.lunar": "🧧 新春快乐！愿你的 token 年年有余",
   "set.featGarden": "像素菜园",
   "set.featGardenSub": "三块小地：额度省着用菜就长得快，成熟收获喂宠物",
   "ach.harvest.title": "丰收达人",
@@ -287,6 +294,12 @@ const en = {
   "crop.carrot": "carrot",
   "crop.tomato": "tomato",
   "crop.sunflower": "sunflower",
+  "crop.pumpkin": "pumpkin",
+
+  "season.halloween": "🎃 Happy Halloween! Spooky tokens tonight… pumpkins joined the garden rotation",
+  "season.christmas": "🎄 Merry Christmas! Keep the quota cozy",
+  "season.newyear": "🎆 Happy New Year! New year, fresh quota",
+  "season.lunar": "🧧 Happy Lunar New Year! May your tokens overflow",
   "set.featGarden": "Pixel garden",
   "set.featGardenSub": "Three plots: they grow faster when you ration your quota; harvest to feed the pet",
   "ach.harvest.title": "Harvest Master",
@@ -484,6 +497,12 @@ const lines = {
       coworkHeavy: ["Cowork 用得挺勤快嘛", "让 Cowork 干活, 你摸鱼?", "Cowork 都快成本周主力了"],
       codeHeavy: ["今天全泡在 Claude Code 里~", "命令行战士, 冲!"],
     },
+    season: {
+      halloween: ["不给糖就…烧你的 token 🎃", "今晚乌鸦会变蝙蝠吗 🦇", "南瓜熟了记得收, 别便宜了乌鸦"],
+      christmas: ["🎄 圣诞老人也在 vibe coding 吗", "下雪了, 额度也该冷静冷静", "许个愿: 周额度翻倍"],
+      newyear: ["🎆 新年第一个 bug 会是什么呢", "新年新额度, 冲!", "去年的 token 不要再想了"],
+      lunar: ["🧧 发红包了吗? 我只要 token", "过年也在写代码, 辛苦啦", "🏮 新的一年, 少见底多收菜"],
+    },
   },
   en: {
     click: {
@@ -532,6 +551,12 @@ const lines = {
       fableHeavy: ["Fable burns bright~ how's the wallet", "✦ on the priciest model again", "one Fable call = three of my meals"],
       coworkHeavy: ["Cowork's been busy, huh", "letting Cowork work while you slack?", "Cowork's basically the MVP this week"],
       codeHeavy: ["living in Claude Code today~", "terminal warrior, charge!"],
+    },
+    season: {
+      halloween: ["trick or… burn your tokens 🎃", "does the crow turn into a bat tonight 🦇", "harvest the pumpkin before the crow does"],
+      christmas: ["🎄 is Santa vibe coding too?", "it's snowing — let the quota chill", "one wish: double the weekly quota"],
+      newyear: ["🎆 what's the first bug of the year going to be", "new year, fresh quota — go!", "last year's tokens are gone, let them go"],
+      lunar: ["🧧 red envelopes? I'll take tokens", "coding over the holidays — hats off", "🏮 new year, fewer dry spells, more harvests"],
     },
   },
 };

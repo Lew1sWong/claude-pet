@@ -124,3 +124,21 @@ test("🐦‍⬛ sleep doesn't count toward the crow (clocks shift by time beyon
   G.tick(h, "happy", 30 * H1);                   // 29 h away, cap 6 h → counts as 7 h ripe
   assert.equal(h.plots[1].crow, null);
 });
+
+test("🎃 seasonal crop joins the rotation only while its season is on", () => {
+  const g = G.newGarden();
+  // rotation with the pumpkin: harvested 0 → plot i picks pool[i % 4]
+  assert.equal(G.plant(g, 3 - 3, null, 0, "pumpkin"), true);  // plot 0 → carrot
+  assert.equal(g.plots[0].crop, "carrot");
+  g.harvested = 2;
+  assert.equal(G.plant(g, 1, null, 0, "pumpkin"), true);      // (2 + 1) % 4 → pumpkin
+  assert.equal(g.plots[1].crop, "pumpkin");
+  // explicit pumpkin outside the season is refused → rotation over the base crops
+  const h = G.newGarden();
+  G.plant(h, 0, "pumpkin", 0, null);
+  assert.equal(h.plots[0].crop, "carrot");
+  // but an existing pumpkin survives sanitize after the season
+  const s = G.sanitize({ plots: [{ crop: "pumpkin", progress: 0.5 }, null, null] });
+  assert.equal(s.plots[0].crop, "pumpkin");
+  assert.equal(G.GROW_MS.pumpkin, 7 * 3600e3);
+});

@@ -76,6 +76,26 @@
         ".......b........",
       ]),
     ],
+    // 🎃 seasonal (Halloween): a vine, then a fat ribbed pumpkin
+    pumpkin: [
+      SEED, SPROUT,
+      top([
+        "......g.g.......",
+        ".....gGgGg......",
+        "...bbbGbGbbb....",
+        "..g.......g.....",
+        ".gGg.....gGg....",
+      ]),
+      top([
+        ".......b........",
+        "......gb........",
+        "....oooOooo.....",
+        "...ooOoooOoo....",
+        "...oOoooOooO....",
+        "...ooOoooOoo....",
+        "....oooOooo.....",
+      ]),
+    ],
     sunflower: [
       SEED, SPROUT,
       top([
@@ -101,7 +121,7 @@
       ]),
     ],
   };
-  const EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻" };
+  const EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻", pumpkin: "🎃" };
 
   // 🐦‍⬛ the crow (two frames: wing down / wing up), overlaid on a ripe plot
   PALETTE.n = "#14141c";   // feathers

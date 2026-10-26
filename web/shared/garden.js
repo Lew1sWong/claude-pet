@@ -8,9 +8,11 @@
   // burning through the quota stalls growth and wilts the plants. Quota resets
   // water the garden. Ripe crops are harvested to feed the pet.
   const CROPS = ["carrot", "tomato", "sunflower"];
+  const SEASONAL_CROPS = ["pumpkin"];                 // only plantable while their season is on
+  const ALL_CROPS = CROPS.concat(SEASONAL_CROPS);
   const PLOTS = 3;
   const STAGES = 4;                                   // 0 seed · 1 sprout · 2 growing · 3 ripe
-  const GROW_MS = { carrot: 5 * 3600e3, tomato: 9 * 3600e3, sunflower: 14 * 3600e3 };  // at full pace
+  const GROW_MS = { carrot: 5 * 3600e3, tomato: 9 * 3600e3, sunflower: 14 * 3600e3, pumpkin: 7 * 3600e3 };  // at full pace
   const MAX_TICK_MS = 6 * 3600e3;                     // cap one catch-up tick (laptop was asleep)
   const WILT_MS = 10 * 3600e3;                        // depleted for this long → fully wilted
   const WATER_BOOST = 0.15;
@@ -36,7 +38,7 @@
     if (Array.isArray(g.plots)) {
       for (let i = 0; i < PLOTS; i++) {
         const p = g.plots[i];
-        if (p && typeof p === "object" && CROPS.includes(p.crop)) {
+        if (p && typeof p === "object" && ALL_CROPS.includes(p.crop)) {
           out.plots[i] = {
             crop: p.crop,
             progress: Math.max(0, Math.min(1, Number(p.progress) || 0)),
@@ -52,7 +54,7 @@
     out.lost = Math.max(0, Math.floor(Number(g.lost) || 0));
     out.shooed = Math.max(0, Math.floor(Number(g.shooed) || 0));
     out.lastTick = Number.isFinite(g.lastTick) ? g.lastTick : null;
-    out.lastLoss = g.lastLoss && CROPS.includes(g.lastLoss.crop) && Number.isFinite(g.lastLoss.at) ? { crop: g.lastLoss.crop, at: g.lastLoss.at } : null;
+    out.lastLoss = g.lastLoss && ALL_CROPS.includes(g.lastLoss.crop) && Number.isFinite(g.lastLoss.at) ? { crop: g.lastLoss.crop, at: g.lastLoss.at } : null;
     return out;
   }
   
@@ -124,9 +126,12 @@
     return g;
   }
   
-  function plant(g, i, crop, now) {
+  // seasonCrop (e.g. "pumpkin" during Halloween) joins the rotation; an explicit
+  // seasonal crop is only accepted while its season is on
+  function plant(g, i, crop, now, seasonCrop) {
     if (i < 0 || i >= PLOTS || g.plots[i]) return false;
-    const c = CROPS.includes(crop) ? crop : CROPS[(g.harvested + i) % CROPS.length];
+    const pool = seasonCrop && SEASONAL_CROPS.includes(seasonCrop) ? CROPS.concat([seasonCrop]) : CROPS;
+    const c = pool.includes(crop) ? crop : pool[(g.harvested + i) % pool.length];
     g.plots[i] = { crop: c, progress: 0, wilt: 0, plantedAt: now, ripeAt: null, crow: null };
     return true;
   }
@@ -140,7 +145,7 @@
   }
   
   module.exports = {
-    CROPS, PLOTS, STAGES, GROW_MS, RATE, CROW_AFTER_MS, CROW_EATS_MS, CROW_MAX_TICK_MS,
+    CROPS, SEASONAL_CROPS, ALL_CROPS, PLOTS, STAGES, GROW_MS, RATE, CROW_AFTER_MS, CROW_EATS_MS, CROW_MAX_TICK_MS,
     newGarden, sanitize, stageOf, tick, water, plant, harvest, shoo, crowAt,
   };
 

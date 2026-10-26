@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0 — 2026-10-26 · "应季彩蛋"
+
+### 🎃🎄🎆🧧 Seasons (desktop + web)
+- `lib/season.js` knows four seasons: Halloween (Oct 20 – Nov 2), Christmas
+  (Dec 18 – 27), New Year (Dec 31 – Jan 2) and Lunar New Year (除夕 → 初六,
+  per-year table through 2030). While one is on:
+  - the pet wears a hat 🎩 — witch / santa / party (hand-drawn overlays that
+    bob with the idle breath and come off while asleep)
+  - a greeting notification once per season (with the achievement fanfare if
+    sounds are on), seasonal quips in the bubble, seasonal celebration emoji,
+    the season's emoji next to the pet's name and in the tray tooltip
+  - **Halloween adds a 🎃 pumpkin** to the garden rotation (7 h at full pace).
+    Pumpkins planted during the season keep growing after it ends.
+- Everything flows through the shared modules, so the PWA gets it too.
+
 ## 0.5.0 — 2026-10-26 · "手机版补齐"
 
 ### 📱 Web / PWA parity
