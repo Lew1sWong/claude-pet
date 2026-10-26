@@ -249,9 +249,22 @@
   function refreshReport() {
     reportEl.classList.toggle("hidden", !reportOpen);
     reportEl.parentElement.classList.toggle("report-mode", reportOpen);
-    if (reportOpen) renderReport(reportEl, usage && usage.report, usage && usage.lastReport);
+    if (reportOpen) renderReport(reportEl, usage && usage.report, usage && usage.lastReport, shareReport);
     fitExpanded();
   }
+  // 📤 share: render the pixel card and hand the PNG to main (Downloads + clipboard)
+  function shareReport() {
+    try {
+      const c = document.createElement("canvas");
+      window.PetCore.renderShareCard(c, {
+        report: usage && usage.report, character, hat: season ? season.hat : null,
+        seriesW: usage && usage.trend ? usage.trend.seriesW : [], lastReport: usage && usage.lastReport,
+      });
+      api.shareReport(c.toDataURL("image/png"));
+      sfx("level");
+    } catch (e) { sayTemp(t("report.shareFail"), 2000); }
+  }
+
   document.getElementById("report").addEventListener("click", () => { reportOpen = !reportOpen; sfx("click"); refreshReport(); });
   // ⛈ live weather on the overlay canvas, driven by the forecast
   function refreshWeather() {

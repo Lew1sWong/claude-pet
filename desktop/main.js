@@ -1,7 +1,7 @@
 // Claude Pet — floating desktop pet (Electron main process)
 const {
   app, BrowserWindow, Tray, Menu, screen, ipcMain, Notification, nativeImage,
-  globalShortcut,
+  globalShortcut, clipboard,
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -390,8 +390,8 @@ function createWindow() {
           // CLAUDE_PET_SMOKE_SHOT=/path.png: force the HUD open and capture it
           if (process.env.CLAUDE_PET_SMOKE_SHOT) {
             await win.webContents.executeJavaScript(
-              "(function(){const h=document.getElementById('hud');if(h)h.classList.remove('hidden');const i=document.getElementById('island');if(i&&!keep_collapsed){i.classList.remove('collapsed');i.classList.add('expanded');}const r=document.getElementById('report');if(r&&process_env_report)r.click();})()".replace("process_env_report", process.env.CLAUDE_PET_SMOKE_REPORT ? "true" : "false").replace("keep_collapsed", process.env.CLAUDE_PET_SMOKE_COLLAPSED ? "true" : "false"));
-            await new Promise((r) => setTimeout(r, 700));
+              "(function(){const h=document.getElementById('hud');if(h)h.classList.remove('hidden');const i=document.getElementById('island');if(i&&!keep_collapsed){i.classList.remove('collapsed');i.classList.add('expanded');}const r=document.getElementById('report');if(r&&process_env_report&&!document.querySelector('.report-mode'))r.click();if(smoke_share)setTimeout(function(){var b=document.querySelector('.rc-share');if(b)b.click();},400);})()".replace("process_env_report", process.env.CLAUDE_PET_SMOKE_REPORT ? "true" : "false").replace("keep_collapsed", process.env.CLAUDE_PET_SMOKE_COLLAPSED ? "true" : "false").replace("smoke_share", process.env.CLAUDE_PET_SMOKE_SHARE ? "true" : "false"));
+            await new Promise((r) => setTimeout(r, process.env.CLAUDE_PET_SMOKE_SHARE ? 1500 : 700));
             const img = await win.webContents.capturePage();
             fs.writeFileSync(process.env.CLAUDE_PET_SMOKE_SHOT, img.toPNG());
             console.log("SMOKE shot:", process.env.CLAUDE_PET_SMOKE_SHOT, img.getSize());
@@ -595,6 +595,7 @@ function checkClaudeNotifications(usage, trend) {
         if (rep && rep.grade) {
           settings.lastReport = { ...rep, at: Date.now() };
           gradedNow = true;
+          if (garden) { G.applyGradeBoost(garden, rep.grade, Date.now()); saveGarden(); }   // 🌟 S / A → faster garden next week
           notify(tr("report.notify").replace("{grade}", rep.grade).replace("{title}", tr("title." + rep.title))
             .replace("{pct}", String(Math.round(rep.usedPct || 0))).replace("{n}", String(rep.depletions)));
         }
@@ -846,6 +847,25 @@ ipcMain.on("garden-plant", (_e, i, crop) => {
   const season = currentSeason(new Date());
   if (G.plant(garden, Number(i), typeof crop === "string" ? crop : null, Date.now(), season ? season.crop : null)) saveGarden();
 });
+// 📤 the shareable report card: PNG → Downloads + clipboard
+ipcMain.on("share-report", (_e, dataUrl) => {
+  try {
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/png;base64,") || dataUrl.length > 8e6) return;
+    const img = nativeImage.createFromDataURL(dataUrl);
+    if (img.isEmpty()) return;
+    const dir = process.env.CLAUDE_PET_SHARE_DIR || app.getPath("downloads");
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const file = path.join(dir, `claude-pet-week-${stamp}.png`);
+    fs.writeFileSync(file, img.toPNG());
+    clipboard.writeImage(img);
+    notify(tr("report.shared"));
+    console.log("share-report saved:", file);
+  } catch (e) {
+    notify(tr("report.shareFail"));
+  }
+});
+
 ipcMain.on("garden-shoo", (_e, i) => {
   if (!garden) return;
   if (G.shoo(garden, Number(i), Date.now())) {

@@ -465,7 +465,10 @@
             : thirsty ? tt("garden.thirsty").replace("{crop}", crop)
               : tt("garden.growing").replace("{crop}", crop).replace("{pct}", String(Math.round(p.progress * 100)));
     });
-    container._hint.textContent = tt("garden.hint") + (garden.harvested ? ` · 🧺 ${garden.harvested}` : "");
+    const boost = garden.boost && Date.now() < garden.boost.until && garden.boost.factor > 1 ? garden.boost : null;
+    container._hint.textContent = (boost
+      ? tt("garden.boost").replace("{x}", String(boost.factor)).replace("{grade}", boost.grade || "A")
+      : tt("garden.hint")) + (garden.harvested ? ` · 🧺 ${garden.harvested}` : "");
   }
 
   // ---- ⛈ live quota weather: pixel rain / lightning / sunny sparkles on an
@@ -533,7 +536,8 @@
   }
 
   // ---- 📋 weekly report card ----
-  function renderReport(container, report, lastReport) {
+  // onShare(): optional — adds a 📤 button under the card
+  function renderReport(container, report, lastReport, onShare) {
     if (!container) return;
     container.textContent = "";
     const el = (cls, text, parent) => { const d = document.createElement("div"); d.className = cls; if (text != null) d.textContent = text; (parent || container).appendChild(d); return d; };
@@ -553,6 +557,82 @@
     el("rc-row", tt("report.garden").replace("{h}", String(report.harvested)).replace("{l}", String(report.lost)).replace("{s}", String(report.shooed)));
     (report.tips || []).forEach((k) => el("rc-tip", "💡 " + tt("tip." + k)));
     if (lastReport && lastReport.grade) el("rc-last", tt("report.last").replace("{grade}", lastReport.grade).replace("{title}", tt("title." + lastReport.title)));
+    if (typeof onShare === "function") {
+      const b = document.createElement("button");
+      b.className = "rc-share";
+      b.textContent = tt("report.share");
+      b.addEventListener("click", (e) => { e.stopPropagation(); onShare(); });
+      container.appendChild(b);
+    }
+  }
+
+  // ---- 📤 shareable pixel report card (PNG) ----
+  // d: { report, character, hat, seriesW, lastReport }. Draws a 600×340 card at
+  // 2× into `canvas` and returns it.
+  function renderShareCard(canvas, d) {
+    const S = 2, W = 600, H = 340;
+    canvas.width = W * S; canvas.height = H * S;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(S, 0, 0, S, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    const en = typeof window !== "undefined" && window.__lang === "en";
+    const font = (px, bold) => `${bold ? "bold " : ""}${px}px -apple-system, "PingFang SC", "Helvetica Neue", "Segoe UI", sans-serif`;
+    // background + pixel frame
+    ctx.fillStyle = "#15151f"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#1e1e2e"; for (let x = 0; x < W; x += 12) for (let y = 0; y < H; y += 12) if ((x + y) % 24 === 0) ctx.fillRect(x, y, 1, 1);
+    ctx.strokeStyle = "#8e7cc3"; ctx.lineWidth = 2; ctx.strokeRect(5, 5, W - 10, H - 10);
+    ctx.strokeStyle = "#3a3a4a"; ctx.lineWidth = 1; ctx.strokeRect(9.5, 9.5, W - 19, H - 19);
+    // the pet (with its hat) at ×6
+    const off = document.createElement("canvas"); off.width = 16; off.height = 16;
+    try { drawPet(off.getContext("2d"), d.character || "cat", "idle", 0, false, d.hat || null); } catch { /* ignore */ }
+    ctx.drawImage(off, 0, 0, 16, 16, 28, 34, 96, 96);
+    // header
+    ctx.fillStyle = "#e8e8f0"; ctx.font = font(20, true); ctx.textBaseline = "top";
+    ctx.fillText("Claude Pet · " + tt("report.card.title"), 146, 32);
+    const r = d.report || {};
+    const since = r.since ? new Date(r.since) : null;
+    const fmtD = (t) => `${t.getMonth() + 1}/${t.getDate()}`;
+    ctx.fillStyle = "#9a9ab0"; ctx.font = font(12);
+    ctx.fillText((since ? fmtD(since) + " – " : "") + fmtD(new Date()), 146, 58);
+    // grade box
+    const colors = { S: "#f5d142", A: "#6cc887", B: "#e6b455", C: "#d9634f" };
+    const gc = colors[r.grade] || "#9a9ab0";
+    ctx.strokeStyle = gc; ctx.lineWidth = 3; ctx.strokeRect(478, 30, 92, 92);
+    ctx.fillStyle = gc; ctx.font = font(60, true); ctx.textAlign = "center";
+    ctx.fillText(r.grade || "?", 524, 42);
+    ctx.textAlign = "left";
+    // title + stats
+    ctx.fillStyle = "#f5d142"; ctx.font = font(26, true);
+    ctx.fillText(r.title ? tt("title." + r.title) : "—", 146, 84);
+    ctx.fillStyle = "#c8c8d8"; ctx.font = font(15);
+    const used = r.usedPct !== null && r.usedPct !== undefined ? Math.round(r.usedPct) + "%" : "—";
+    ctx.fillText(`${tt("report.card.used")} ${used} · ${tt("report.card.dry")} ${r.depletions || 0}${tt("report.card.times")} · ${tt("report.card.close")} ${r.nearMisses || 0}${tt("report.card.times")}`, 146, 128);
+    const peak = r.peakDay !== null && r.peakDay !== undefined ? tt("day." + r.peakDay) : "—";
+    ctx.fillText(`${tt("report.peak").replace("{day}", peak)} · ${tt("report.card.late")} ${Math.round((r.lateNightShare || 0) * 100)}%`, 146, 152);
+    ctx.fillText(`🧺 ${tt("report.card.harvest")} ${r.harvested || 0} · 🐦‍⬛ ${r.lost || 0} · 🌱 ${r.shooed || 0}`, 146, 176);
+    (r.tips || []).slice(0, 1).forEach((k) => { ctx.fillStyle = "#f0d890"; ctx.fillText("💡 " + tt("tip." + k), 146, 200); });
+    // weekly sparkline
+    const sx = 28, sy = 236, sw = 544, sh = 64;
+    ctx.fillStyle = "#9a9ab0"; ctx.font = font(11); ctx.fillText(tt("report.card.week"), sx, sy - 14);
+    ctx.fillStyle = "rgba(255,255,255,.06)"; ctx.fillRect(sx, sy, sw, sh);
+    ctx.fillStyle = "rgba(255,255,255,.14)"; for (const g of [70, 90]) { const y = Math.round(sy + sh - (g / 100) * sh); for (let x = sx; x < sx + sw; x += 6) ctx.fillRect(x, y, 2, 1); }
+    const series = Array.isArray(d.seriesW) ? d.seriesW : [];
+    if (series.length > 1) {
+      const t0 = series[0][0], t1 = series[series.length - 1][0] || t0 + 1;
+      let px = null, py = null;
+      for (const [t, pct] of series) {
+        const x = Math.round(sx + ((t - t0) / Math.max(1, t1 - t0)) * (sw - 2));
+        const y = Math.round(sy + sh - 2 - (Math.max(0, Math.min(100, pct)) / 100) * (sh - 4));
+        ctx.fillStyle = pct >= 90 ? "#ff6b5e" : pct >= 70 ? "#e6c455" : "#6cc887";
+        if (px !== null) { ctx.fillRect(Math.min(px, x), py, Math.abs(x - px) + 2, 2); ctx.fillRect(x, Math.min(py, y), 2, Math.abs(y - py) + 2); }
+        ctx.fillRect(x, y, 2, 2); px = x; py = y;
+      }
+    }
+    // footer
+    ctx.fillStyle = "#6a6a80"; ctx.font = font(11);
+    ctx.fillText("github.com/Lew1sWong/claude-pet", sx, 314);
+    ctx.textAlign = "right"; ctx.fillText(en ? "my week with Claude 🐾" : "我和 Claude 的一周 🐾", sx + sw, 314); ctx.textAlign = "left";
+    return canvas;
   }
 
   window.PetCore = {
@@ -561,6 +641,6 @@
     drawPet, frameCount, mergeCustomPets,
     renderOthers, renderScoped, renderExtra, renderBreakdown,
     drawSparkline, renderTrend, renderGarden, stageOfPlot,
-    setWeatherFx, renderReport,
+    setWeatherFx, renderReport, renderShareCard,
   };
 })();

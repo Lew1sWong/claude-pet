@@ -1,7 +1,7 @@
 {
   "name": "claude-pet-desktop",
   "productName": "Claude Pet",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "完全悬浮的 8-bit Claude 用量桌宠：透明、置顶、全屏游走（macOS / Windows）",
   "main": "main.js",
   "license": "MIT",

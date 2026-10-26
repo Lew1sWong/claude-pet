@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.0 — 2026-10-27 · "晒成绩单 + 好周有奖"
+
+### 📤 Shareable report card
+- A 📤 button on the weekly report card renders a 600×340 pixel card (the
+  pet with its hat, grade, title, stats, a tip and the weekly quota line)
+  as a PNG. Desktop: saved to Downloads and copied to the clipboard. Web:
+  the Web Share sheet with the image on phones, a download elsewhere.
+
+### 🌟 Good week, faster garden
+- An **S** grade on the weekly report gives the garden ×1.3 growth for the
+  next 7 days, an **A** ×1.15 (shown in the garden hint). No penalty for
+  worse weeks. Desktop + web.
+
 ## 0.7.0 — 2026-10-27 · "灵动岛一眼看懂 + 可测试的提醒"
 
 ### 🏝 Dynamic Island pill badge

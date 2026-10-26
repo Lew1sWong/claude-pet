@@ -254,3 +254,7 @@ html, body {
 
 /* 📋 report mode: only the head row and the card stay visible */
 .body.report-mode > :not(.body-head):not(#report-card) { display: none !important; }
+
+/* 📤 share button on the report card */
+.rc-share { margin-top: 7px; font-family: inherit; font-size: 11px; padding: 4px 8px; color: #cfd0e0; background: rgba(255,255,255,.06); border: 1px solid rgba(179,157,219,.5); border-radius: 8px; cursor: pointer; }
+.rc-share:hover { background: rgba(255,255,255,.16); }

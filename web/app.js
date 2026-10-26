@@ -280,7 +280,30 @@
     if (!reportOpen) return;
     // re-grade on open so a harvest / shoo made since the last poll shows up
     if (usage) usage.report = R.computeReport(currentSamples, weekGardenOpts(), Date.now());
-    renderReport(reportEl, usage && usage.report, usage && usage.lastReport);
+    renderReport(reportEl, usage && usage.report, usage && usage.lastReport, shareReport);
+  }
+  // 📤 share: Web Share with the PNG when the browser can, else a download
+  function shareReport() {
+    try {
+      const c = document.createElement("canvas");
+      window.PetCore.renderShareCard(c, {
+        report: usage && usage.report, character, hat: season ? season.hat : null,
+        seriesW: usage && usage.trend ? usage.trend.seriesW : [], lastReport: usage && usage.lastReport,
+      });
+      c.toBlob((blob) => {
+        if (!blob) { sayTemp(t("report.shareFail"), 2000); return; }
+        const name = "claude-pet-week.png";
+        const file = new File([blob], name, { type: "image/png" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: "Claude Pet" }).catch(() => {});
+        } else {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob); a.download = name; a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        }
+        sfx("level");
+      }, "image/png");
+    } catch (e) { sayTemp(t("report.shareFail"), 2000); }
   }
   function refreshWeather() {
     const tr = usage && usage.trend;
@@ -423,6 +446,7 @@
           if (rep && rep.grade) {
             const graded = { ...rep, at: Date.now() };
             setJSON(LS.lastReport, graded);
+            G.applyGradeBoost(garden, rep.grade, Date.now()); saveGarden();   // 🌟 S / A → faster garden next week
             u.lastReport = graded;   // decorate() ran before us — the open card must show this week, not the one before
             notifyUser(t("report.notify").replace("{grade}", rep.grade).replace("{title}", t("title." + rep.title))
               .replace("{pct}", String(Math.round(rep.usedPct || 0))).replace("{n}", String(rep.depletions)));
