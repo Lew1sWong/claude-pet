@@ -24,12 +24,15 @@
   // ticking (every minute). A gap longer than this means the laptop slept or
   // the app was closed — that time doesn't count toward the crow.
   const CROW_MAX_TICK_MS = 10 * 60e3;
+  // 📋 a good week on the report card speeds the garden up for the next one
+  const BOOST_BY_GRADE = { S: 1.3, A: 1.15 };
+  const BOOST_MS = 7 * 24 * 3600e3;
   
   // mood → growth multiplier (also used while wilted plants recover)
   const RATE = { happy: 1, calm: 0.8, sleepy: 0.45, anxious: 0.15, overage: 0.15, depleted: 0, lost: 0.3, unknown: 0.5 };
   
   function newGarden() {
-    return { plots: Array.from({ length: PLOTS }, () => null), harvested: 0, lost: 0, shooed: 0, lastTick: null, lastLoss: null };
+    return { plots: Array.from({ length: PLOTS }, () => null), harvested: 0, lost: 0, shooed: 0, lastTick: null, lastLoss: null, boost: null };
   }
   
   function sanitize(g) {
@@ -55,6 +58,9 @@
     out.shooed = Math.max(0, Math.floor(Number(g.shooed) || 0));
     out.lastTick = Number.isFinite(g.lastTick) ? g.lastTick : null;
     out.lastLoss = g.lastLoss && ALL_CROPS.includes(g.lastLoss.crop) && Number.isFinite(g.lastLoss.at) ? { crop: g.lastLoss.crop, at: g.lastLoss.at } : null;
+    const b = g.boost;
+    out.boost = b && typeof b === "object" && Number.isFinite(b.factor) && b.factor > 1 && Number.isFinite(b.until)
+      ? { factor: Math.min(2, b.factor), until: b.until, grade: typeof b.grade === "string" ? b.grade : null } : null;
     return out;
   }
   
@@ -73,7 +79,9 @@
     const skipped = elapsed - Math.min(CROW_MAX_TICK_MS, elapsed);
     g.lastTick = now;
     if (!dt) return g;
-    const rate = RATE[mood] != null ? RATE[mood] : RATE.unknown;
+    const boost = activeBoost(g, now);
+    const rate = (RATE[mood] != null ? RATE[mood] : RATE.unknown) * (boost ? boost.factor : 1);
+    if (g.boost && !boost) g.boost = null;   // expired
     g.plots.forEach((p, i) => {
       if (!p) return;
       if (skipped > 0) {
@@ -100,6 +108,19 @@
       }
     });
     return g;
+  }
+  
+  // the week's growth boost, or null once it has run out
+  function activeBoost(g, now) {
+    const b = g && g.boost;
+    return b && Number.isFinite(b.until) && now < b.until && b.factor > 1 ? b : null;
+  }
+  // called when a week is graded: S / A grades speed up the coming week
+  function applyGradeBoost(g, grade, now) {
+    const factor = BOOST_BY_GRADE[grade];
+    if (!factor) { g.boost = null; return null; }
+    g.boost = { factor, until: now + BOOST_MS, grade };
+    return g.boost;
   }
   
   // click the crow: it flies off and the ripe crop is safe for another while
@@ -146,7 +167,8 @@
   
   module.exports = {
     CROPS, SEASONAL_CROPS, ALL_CROPS, PLOTS, STAGES, GROW_MS, RATE, CROW_AFTER_MS, CROW_EATS_MS, CROW_MAX_TICK_MS,
-    newGarden, sanitize, stageOf, tick, water, plant, harvest, shoo, crowAt,
+    BOOST_BY_GRADE, BOOST_MS,
+    newGarden, sanitize, stageOf, tick, water, plant, harvest, shoo, crowAt, activeBoost, applyGradeBoost,
   };
 
   window.PetGarden = module.exports;

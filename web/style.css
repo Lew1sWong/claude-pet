@@ -339,3 +339,7 @@ html, body {
 .field.check { flex-direction: row; align-items: center; gap: 8px; }
 .field.check input { width: auto; margin: 0; }
 .field select { width: 100%; }
+
+/* 📤 share button on the report card */
+.rc-share { margin-top: 8px; font-family: inherit; font-size: 12px; padding: 6px 10px; color: #e8e8f0; background: transparent; border: 1px solid #8e7cc3; border-radius: 6px; cursor: pointer; }
+.rc-share:active { background: rgba(142, 124, 195, .25); }

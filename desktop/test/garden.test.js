@@ -142,3 +142,25 @@ test("🎃 seasonal crop joins the rotation only while its season is on", () => 
   assert.equal(s.plots[0].crop, "pumpkin");
   assert.equal(G.GROW_MS.pumpkin, 7 * 3600e3);
 });
+
+test("📋 an S / A week boosts growth for the next 7 days; C doesn't; the boost expires", () => {
+  const g = G.newGarden();
+  assert.equal(G.applyGradeBoost(g, "C", 0), null);
+  assert.equal(g.boost, null);
+  assert.deepEqual(G.applyGradeBoost(g, "S", 0), { factor: 1.3, until: 7 * 24 * H1, grade: "S" });
+  G.plant(g, 0, "carrot", 0);
+  G.tick(g, "happy", 0);
+  G.tick(g, "happy", 1 * H1);                                   // 1 h at 1.3× → 1.3/5
+  assert.ok(Math.abs(g.plots[0].progress - 1.3 / 5) < 1e-9, "boosted: " + g.plots[0].progress);
+  assert.ok(G.activeBoost(g, 6 * 24 * H1));
+  assert.equal(G.activeBoost(g, 8 * 24 * H1), null);
+  G.tick(g, "happy", 8 * 24 * H1);                              // past `until` → boost dropped
+  assert.equal(g.boost, null);
+  // A → 1.15; sanitize keeps a valid boost and drops garbage
+  G.applyGradeBoost(g, "A", 0);
+  assert.equal(g.boost.factor, 1.15);
+  const s = G.sanitize({ plots: [], boost: { factor: 9, until: 5, grade: "S" } });
+  assert.equal(s.boost.factor, 2);                               // capped
+  assert.equal(G.sanitize({ plots: [], boost: { factor: 1, until: 5 } }).boost, null);
+  assert.equal(G.sanitize({ plots: [], boost: "x" }).boost, null);
+});
