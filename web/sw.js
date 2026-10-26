@@ -1,6 +1,6 @@
 /* Claude Pet PWA service worker — cache the app shell so it opens offline.
    Bump CACHE when you change any shell file. */
-const CACHE = "claude-pet-v5";
+const CACHE = "claude-pet-v6";
 const SHELL = [
   ".",
   "index.html",
@@ -13,6 +13,7 @@ const SHELL = [
   "shared/garden.js",
   "shared/report.js",
   "shared/season.js",
+  "shared/alerts.js",
   "shared/gardensprites.js",
   "shared/seasonsprites.js",
   "shared/sfx.js",
@@ -39,8 +40,11 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   // never cache API / usage calls — always go to the network
   if (url.origin !== self.location.origin) return;
-  // cache-first for the static shell, fall back to network
+  // cache-first for the static shell, fall back to network; only page
+  // navigations fall back to the cached index.html — a same-origin relay
+  // request must fail honestly instead of getting HTML "200"s
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).catch(() => caches.match("index.html")))
+    caches.match(e.request).then((hit) => hit || fetch(e.request).catch(() =>
+      (e.request.mode === "navigate" ? caches.match("index.html") : Promise.reject(new TypeError("offline")))))
   );
 });

@@ -64,6 +64,7 @@ npm start
 Claude's usage API (as of Oct 2026) reports a structured list of limits instead of two plain numbers, and the pet reads all of it:
 
 - **5h / weekly** — the session window and the weekly all-models window (the one currently binding is what `claude`'s `/usage` lists first).
+- **Dynamic Island at a glance** — the collapsed pill shows the 5h % plus a badge: 🐦‍⬛ when a crow needs shooing, the quota weather (🌤 🌧 ⛈) when it's not sunny, or the season's emoji.
 - **Model-scoped weekly windows** — e.g. the **Fable ✦** weekly limit on Max / Team Premium plans (Fable 5.1 and Mythos 5.1 share it; it's a share of the weekly allowance — hover the label to see the share). Each scoped window gets its own bar — violet for Fable, teal for anything else — labelled straight from the API, so a newly scoped model shows up without an app update. Fable keeps its dedicated **80% / 95%** notifications and reset celebration, and the tray tooltip lists every window.
 - **Usage credits 💸** (the API calls them "extra usage") — if you've enabled them, a gold bar shows how much of your monthly spend limit you've burned (plus the amount). When the plan limits are dry but credits are carrying the load ("Now using credits" in Claude Code), the pet doesn't fall asleep: it enters the **overage** mood, paces, nags about the bill, and notifies you at **80% / 95%** of the spend limit.
 - **This week** — a one-liner of where the weekly usage went (Claude Code / Chats / Cowork / Other).
@@ -217,6 +218,7 @@ npm start
 Claude 的用量接口（2026 年 10 月起）返回的是一张结构化的额度列表，而不只是两个百分比，桌宠把它们全读进来：
 
 - **5h / 周** —— 会话窗口 + 全模型周窗口（当前真正卡住你的那条，就是 `claude` 的 `/usage` 排在最前面的那条）。
+- **灵动岛一眼看懂** —— 收起的胶囊除了 5h%，还有一个小标记：有乌鸦时是 🐦‍⬛（点一下展开去赶），天气不好时是 🌤 🌧 ⛈，过节时是节日表情。
 - **模型专属周额度** —— 比如 Max / Team Premium 计划的 **Fable ✦** 周额度（Fable 5.1 和 Mythos 5.1 共用；它是周额度的一部分，鼠标悬停标签能看到占比）。每条专属额度一根进度条：Fable 紫色、其他青色，标签直接取自接口，以后新增的专属模型不用更新 App 也会出现。Fable 依旧有专属的 **80% / 95%** 通知和重置庆祝，托盘悬浮提示会列出每一条额度。
 - **额外用量 💸**（官方叫「用量积分 / usage credits」，接口字段是 `extra_usage`）—— 开了的话，会多一根金色进度条显示月消费上限用了多少（和金额）。计划额度烧光但积分还在顶着时（Claude Code 里显示 "Now using credits"），宠物不会睡觉，而是进入 **烧钱** 心情：来回踱步、碎碎念账单，并在用到上限的 **80% / 95%** 时弹通知。
 - **本周去向** —— 一行小字告诉你这周的额度花在了哪（Claude Code / 对话 / Cowork / 其他）。

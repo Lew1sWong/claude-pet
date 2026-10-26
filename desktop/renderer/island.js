@@ -21,6 +21,7 @@
   const canvas = document.getElementById("pet");
   const ctx = canvas.getContext("2d");
   const miniPct = document.getElementById("mini-pct");
+  const miniBadge = document.getElementById("mini-badge");
   const nameEl = document.getElementById("pet-name");
   const bubble = document.getElementById("bubble");
   const msgEl = document.getElementById("msg");
@@ -145,7 +146,23 @@
     lineEl.textContent = cd ? "↻ " + cd : "";
   }
 
+  const WEATHER_EMOJI = { cloudy: "🌤", rain: "🌧", storm: "⛈" };
+  // the collapsed pill's badge: a crow needs you (click → expand), then bad
+  // weather, then the season's emoji; nothing when all is calm
+  function refreshBadge() {
+    let b = "", cls = "";
+    if (garden && garden.plots && garden.plots.some((p) => p && p.crow)) { b = "🐦‍⬛"; cls = "crow"; }
+    else {
+      const tr = usage && usage.trend;
+      const wx = tr ? (tr.worst === "w" ? tr.week : tr.five) : null;
+      if (wx && WEATHER_EMOJI[wx.weather]) b = WEATHER_EMOJI[wx.weather];
+      else if (season) b = season.fx[0];
+    }
+    miniBadge.textContent = b;
+    miniBadge.className = b ? cls : "hidden";
+  }
   function refreshMini() {
+    refreshBadge();
     if (errorCode === "no-credentials" || errorCode === "auth") { miniPct.textContent = "?"; miniPct.className = ""; return; }
     if (errorCode === "rate-limit") { miniPct.textContent = "🚦"; miniPct.className = ""; return; }
     if (mode === "overage") { miniPct.textContent = "💸"; miniPct.className = "danger"; return; }
@@ -205,7 +222,7 @@
     let n = 0;
     const tk = setInterval(() => { spawnFx(n % 2 ? "♥" : (CROP_EMOJI[crop] || "🌱")); if (++n > 4) clearInterval(tk); }, 220);
   }
-  function refreshGarden() { renderGarden(gardenEl, gardenOn ? garden : null, onPlot); }
+  function refreshGarden() { renderGarden(gardenEl, gardenOn ? garden : null, onPlot); refreshBadge(); }
   let lastShooed = -1;
   let lastLossAt = 0;
   api.onGarden((g) => {
@@ -322,7 +339,7 @@
   function overPill(el) {
     if (!el) return false;
     if (island.classList.contains("expanded")) return !!el.closest("#island");
-    return !!el.closest("#pet, #mini-pct");
+    return !!el.closest("#pet, #mini-pct, #mini-badge");
   }
   let ignoring = null;
   document.addEventListener("mousemove", (e) => {
@@ -362,6 +379,7 @@
     spawnFx("♥");
   }
   canvas.addEventListener("click", onPetClick);
+  miniBadge.addEventListener("click", (e) => { e.stopPropagation(); expand(); });
 
   function feedPet() {
     const lines = FEED_LINES[character] || BUDDY_LINES.feed;

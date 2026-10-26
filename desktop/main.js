@@ -11,6 +11,7 @@ const { pushSample, trendOf } = require("./lib/history");
 const G = require("./lib/garden");
 const { computeReport } = require("./lib/report");
 const { currentSeason, seasonKey } = require("./lib/season");
+const A = require("./lib/alerts");
 const { collectOthers } = require("./lib/providers");
 const { createBossController, DEFAULT_DISGUISES } = require("./lib/bossKey");
 const { readNotch } = require("./lib/notch");
@@ -50,14 +51,6 @@ let tray = null;
 let lastUsage = null;
 let dragTimer = null;
 let pollTimer = null;
-let prevFiveHourPct = null;
-let prevFablePct = null;     // Fable gets its own threshold reminders
-let prevWeekPct = null;      // weekly reset celebration
-let prevWeekReset = null;    // weekly window's resets_at — a new one means a new week
-let prevExtraPct = null;     // extra-usage (credits) threshold reminders
-let prevOverage = null;      // plan limits hit while credits carry the load
-const FABLE_THRESHOLDS = [80, 95];
-const EXTRA_THRESHOLDS = [80, 95];
 let settings = {};
 let cooldownUntil = 0;       // persisted across restarts
 let lastRequestAt = 0;       // wall-clock of last actual network hit
@@ -69,6 +62,8 @@ let islandNotch = null;      // native notch geometry for the Dynamic Island
 let settingsLoaded = false;  // guard: never persist {} if we quit before loading
 let settingsWin = null;      // the Settings / onboarding window
 let bossStarted = false;     // whether the boss-key hook is currently running
+let alertState = A.initialState();   // last fresh reading, for lib/alerts.js decisions
+let lastPollFailed = false;  // the last poll reported an error (auth / no creds / cooldown)
 let garden = null;           // 🌱 pixel garden state (lib/garden.js), persisted in settings
 let gardenTimer = null;      // grows between polls too
 
@@ -87,13 +82,8 @@ function loadSettings() {
     // pre-0.2.0 caches carry `raw` and a bare `fable` (no label/key, no
     // `scoped`) — normalise once so every consumer sees the 0.2.0 contract
     lastUsage = { ...pickClaude(settings.lastUsage), others: settings.lastUsage.others || [] };
-    prevFiveHourPct = lastUsage.fiveHour ? lastUsage.fiveHour.pct : null;
-    prevFablePct = lastUsage.fable ? lastUsage.fable.pct : null;
-    prevWeekPct = lastUsage.week ? lastUsage.week.pct : null;
-    prevWeekReset = lastUsage.week ? lastUsage.week.resetsAt || null : null;
-    prevExtraPct = lastUsage.extra && typeof lastUsage.extra.pct === "number" ? lastUsage.extra.pct : null;
-    prevOverage = isOverage(lastUsage);
   }
+  alertState = A.stateFromUsage(lastUsage, settings.paceAlarm, isOverage);
 }
 function saveSettings() {
   try {
@@ -156,28 +146,6 @@ function reportPayload(samples) {
   return computeReport(samples || settings.history, weekGardenOpts(), Date.now());
 }
 
-// ⛈ pace alarm: once per window instance when the forecast says the window
-// runs dry before its reset (5h: only "storm"; weekly: "rain" or "storm")
-function checkPaceAlarms(u, trend) {
-  if (!u || !trend) return;
-  const al = settings.paceAlarm || (settings.paceAlarm = {});
-  for (const key of ["f", "w"]) {
-    const o = key === "f" ? trend.five : trend.week;
-    const win = key === "f" ? u.fiveHour : u.week;
-    const id = win && win.resetsAt ? String(win.resetsAt) : null;
-    if (!o || !id) continue;
-    const bad = key === "f" ? o.weather === "storm" : (o.weather === "storm" || o.weather === "rain");
-    // an already-dry window has no ETA (the depleted/overage moods cover it);
-    // a weekly window only alarms once it's meaningfully underway
-    const underway = key === "f" || (win.pct >= 30);
-    if (bad && underway && typeof o.etaMs === "number" && al[key] !== id) {
-      al[key] = id;
-      notify(tr(`trend.alarm.${key}`).replace("{eta}", fmtDur(o.etaMs)).replace("{reset}", fmtDur(o.resetMs)));
-      sendToWin("sfx", "warn");
-    }
-  }
-}
-
 // ---- 🌱 garden: grows at the pace of the current mood, persisted in settings ----
 function gardenPayload() {
   return { ...garden, lastHarvest: settings.gardenLastHarvest || null };
@@ -208,8 +176,9 @@ function saveGarden() {
   saveSettings();
   sendToWin("garden", gardenPayload());
   // the report card counts harvests / losses / shoos — refresh it right away
-  // instead of waiting for the next poll
-  if (lastUsage) sendToWin("usage", { ...usagePayload(lastUsage), fetchedAt: settings.lastUsageAt || Date.now() });
+  // instead of waiting for the next poll. Not while the last poll failed: a
+  // usage event clears the renderer's error state ("lost" pet, rate-limit line)
+  if (lastUsage && !lastPollFailed) sendToWin("usage", { ...usagePayload(lastUsage), fetchedAt: settings.lastUsageAt || Date.now() });
 }
 // usage + the trend computed from the persisted history, as the renderer expects it
 function usagePayload(u) {
@@ -421,7 +390,7 @@ function createWindow() {
           // CLAUDE_PET_SMOKE_SHOT=/path.png: force the HUD open and capture it
           if (process.env.CLAUDE_PET_SMOKE_SHOT) {
             await win.webContents.executeJavaScript(
-              "(function(){const h=document.getElementById('hud');if(h)h.classList.remove('hidden');const i=document.getElementById('island');if(i){i.classList.remove('collapsed');i.classList.add('expanded');}const r=document.getElementById('report');if(r&&process_env_report)r.click();})()".replace("process_env_report", process.env.CLAUDE_PET_SMOKE_REPORT ? "true" : "false"));
+              "(function(){const h=document.getElementById('hud');if(h)h.classList.remove('hidden');const i=document.getElementById('island');if(i&&!keep_collapsed){i.classList.remove('collapsed');i.classList.add('expanded');}const r=document.getElementById('report');if(r&&process_env_report)r.click();})()".replace("process_env_report", process.env.CLAUDE_PET_SMOKE_REPORT ? "true" : "false").replace("keep_collapsed", process.env.CLAUDE_PET_SMOKE_COLLAPSED ? "true" : "false"));
             await new Promise((r) => setTimeout(r, 700));
             const img = await win.webContents.capturePage();
             fs.writeFileSync(process.env.CLAUDE_PET_SMOKE_SHOT, img.toPNG());
@@ -604,78 +573,52 @@ function notify(body) {
     n.show();
   } catch { /* ignore */ }
 }
-// highest threshold crossed upward between two readings (or null)
-function crossed(prev, cur, thresholds) {
-  if (prev === null || cur === null) return null;
-  for (const th of thresholds.slice().reverse()) if (prev < th && cur >= th) return th;
-  return null;
-}
-
-// reset celebrations (5h / weekly), Fable's dedicated threshold reminders
-// (80% / 95%) and extra-usage (credits) alerts; runs only on a FRESH Claude
-// fetch so cached re-sends can't re-toast
-function checkClaudeNotifications(usage) {
-  const pct = usage.fiveHour ? usage.fiveHour.pct : null;
-  if (prevFiveHourPct !== null && pct !== null && prevFiveHourPct >= 80 && pct <= prevFiveHourPct - 50) {
-    sendToWin("celebrate");
-    sendToWin("sfx", "reset");
-    notify(tr("celebrate.reset"));
-    if (garden) { G.water(garden); saveGarden(); }   // a reset waters the garden
-  }
-  if (pct !== null) prevFiveHourPct = pct;
-
-  const wk = usage.week ? usage.week.pct : null;
-  const wkReset = usage.week ? usage.week.resetsAt || null : null;
-  // a new weekly window: the % dropped like report.js detects it, or the
-  // reset time jumped by more than a day (catches resets the app slept through)
-  const newWeek = (prevWeekPct !== null && wk !== null && wk < prevWeekPct - 15) ||
-    (prevWeekReset && wkReset && Date.parse(wkReset) - Date.parse(prevWeekReset) > 24 * 3600e3);
-  if (newWeek) {
-    // 📋 grade the week that just ended (history minus the post-reset sample)
-    const rep = reportPayload(settings.history.slice(0, -1));
-    if (rep && rep.grade) {
-      settings.lastReport = { ...rep, at: Date.now() };
-      notify(tr("report.notify").replace("{grade}", rep.grade).replace("{title}", tr("title." + rep.title))
-        .replace("{pct}", String(Math.round(rep.usedPct || 0))).replace("{n}", String(rep.depletions)));
-    }
-    const g = garden || G.newGarden();
-    settings.weekGarden = { harvested: g.harvested, lost: g.lost, shooed: g.shooed };
-  }
-  if (prevWeekPct !== null && wk !== null && prevWeekPct >= 50 && wk <= prevWeekPct - 40) {
-    // a big reset is worth a party (and waters the garden)
-    sendToWin("celebrate");
-    sendToWin("sfx", "reset");
-    if (!(newWeek && settings.lastReport && Date.now() - settings.lastReport.at < 5000)) notify(tr("celebrate.weekReset"));
-    if (garden) { G.water(garden); saveGarden(); }
-  }
-  if (wk !== null) prevWeekPct = wk;
-  if (wkReset) prevWeekReset = wkReset;
-
-  const f = usage.fable ? usage.fable.pct : null;
-  if (f !== null && prevFablePct !== null) {
-    const th = crossed(prevFablePct, f, FABLE_THRESHOLDS); // one Fable toast per poll
-    if (th !== null) notify(tr(th >= 95 ? "fable.warn95" : "fable.warn80").replace("{pct}", String(Math.round(f))));
-    if (prevFablePct >= 80 && f <= prevFablePct - 50) {
-      sendToWin("celebrate");
-      notify(tr("fable.reset"));
+// Side effects for the alert events decided in lib/alerts.js (toasts, sounds,
+// watering, grading). Runs only on a FRESH Claude fetch so cached re-sends
+// can't re-toast.
+function checkClaudeNotifications(usage, trend) {
+  const { events, state } = A.evaluate(alertState, usage, trend, { isOverage });
+  alertState = state;
+  settings.paceAlarm = state.pace;
+  let gradedNow = false;
+  const party = () => { sendToWin("celebrate"); sendToWin("sfx", "reset"); if (garden) { G.water(garden); saveGarden(); } };
+  for (const e of events) {
+    switch (e.type) {
+      case "reset":
+        if (e.window === "five") { party(); notify(tr("celebrate.reset")); }
+        else if (e.window === "week") { party(); if (!gradedNow) notify(tr("celebrate.weekReset")); }
+        else if (e.window === "fable") { sendToWin("celebrate"); notify(tr("fable.reset")); }
+        break;
+      case "newWeek": {
+        // 📋 grade the week that just ended (history minus the post-reset sample)
+        const rep = reportPayload(settings.history.slice(0, -1));
+        if (rep && rep.grade) {
+          settings.lastReport = { ...rep, at: Date.now() };
+          gradedNow = true;
+          notify(tr("report.notify").replace("{grade}", rep.grade).replace("{title}", tr("title." + rep.title))
+            .replace("{pct}", String(Math.round(rep.usedPct || 0))).replace("{n}", String(rep.depletions)));
+        }
+        const g = garden || G.newGarden();
+        settings.weekGarden = { harvested: g.harvested, lost: g.lost, shooed: g.shooed };
+        break;
+      }
+      case "fable":
+        notify(tr(e.level >= 95 ? "fable.warn95" : "fable.warn80").replace("{pct}", String(Math.round(e.pct))));
+        break;
+      case "overageOn":
+        notify(tr("extra.on") + (typeof e.pct === "number" ? ` (${Math.round(e.pct)}%)` : ""));
+        break;
+      case "extra":
+        notify(tr(e.level >= 95 ? "extra.warn95" : "extra.warn80").replace("{pct}", String(Math.round(e.pct))));
+        break;
+      case "pace":
+        notify(tr(`trend.alarm.${e.key}`).replace("{eta}", fmtDur(e.etaMs)).replace("{reset}", fmtDur(e.resetMs)));
+        sendToWin("sfx", "warn");
+        break;
+      default:
+        break;
     }
   }
-  if (f !== null) prevFablePct = f;
-
-  // extra usage: one toast when credits start carrying the load, then at
-  // 80% / 95% of the monthly cap
-  const over = isOverage(usage);
-  if (prevOverage === false && over) {
-    const ex = usage.extra;
-    notify(tr("extra.on") + (ex && typeof ex.pct === "number" ? ` (${Math.round(ex.pct)}%)` : ""));
-  }
-  prevOverage = over;
-  const ex = usage.extra && usage.extra.enabled && typeof usage.extra.pct === "number" ? usage.extra.pct : null;
-  if (ex !== null && prevExtraPct !== null) {
-    const th = crossed(prevExtraPct, ex, EXTRA_THRESHOLDS);
-    if (th !== null) notify(tr(th >= 95 ? "extra.warn95" : "extra.warn80").replace("{pct}", String(Math.round(ex))));
-  }
-  prevExtraPct = ex;
 }
 
 // manual=true comes from the refresh button / menu
@@ -742,6 +685,7 @@ async function poll(manual = false) {
   }
 
   const others = await othersPromise;
+  lastPollFailed = claudeError;
 
   if (!claudeError && !isQuitting) {
     // never persist / forward the raw payload — only the renderer contract
@@ -761,9 +705,8 @@ async function poll(manual = false) {
     gardenTick(false);
     persistRateState();
     updateTrayTitle();
-    if (fresh) checkClaudeNotifications(fresh);
+    if (fresh) checkClaudeNotifications(merged, trendOf(settings.history, merged, Date.now()));
     const payload = usagePayload(merged);
-    if (fresh) checkPaceAlarms(merged, payload.trend);
     sendToWin("usage", { ...payload, fetchedAt: Date.now() });
     sendToWin("garden", gardenPayload());
     maybeGreetSeason();   // a season that starts while the app is running

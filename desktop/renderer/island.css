@@ -73,6 +73,9 @@ html, body {
 }
 #mini-pct.warn   { color: #e6c455; }
 #mini-pct.danger { color: #ff6b5e; }
+/* pill badge: 🐦‍⬛ crow / ⛈ weather / 🎃 season — a glance without expanding */
+#mini-badge { font-size: 12px; margin-right: 6px; cursor: pointer; }
+#mini-badge.crow { animation: crow-shake .5s steps(2) infinite; }
 
 /* ---------------- expanded body ---------------- */
 .body {
