@@ -1,6 +1,6 @@
 /* Claude Pet PWA service worker — cache the app shell so it opens offline.
    Bump CACHE when you change any shell file. */
-const CACHE = "claude-pet-v4";
+const CACHE = "claude-pet-v5";
 const SHELL = [
   ".",
   "index.html",
@@ -12,7 +12,9 @@ const SHELL = [
   "shared/history.js",
   "shared/garden.js",
   "shared/report.js",
+  "shared/season.js",
   "shared/gardensprites.js",
+  "shared/seasonsprites.js",
   "shared/sfx.js",
   "shared/petcore.js",
   "manifest.webmanifest",

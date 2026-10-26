@@ -119,7 +119,7 @@
     if (t < celebrateUntil) bob = -Math.abs(Math.sin(t / 85)) * 6;
     canvas.style.transform = `translateY(${bob.toFixed(2)}px)`;
 
-    drawPet(ctx, character, state, frameIdx, t < blinkUntil);
+    drawPet(ctx, character, state, frameIdx, t < blinkUntil, season ? season.hat : null);
   }
   function rafLoop(t) { tick(t); requestAnimationFrame(rafLoop); }
 
@@ -166,7 +166,7 @@
     refreshReport();
     refreshWeather();
     renderOthers(othersEl, usage && usage.others);
-    nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
+    nameEl.textContent = ((SPRITES.names && SPRITES.names[character]) || character) + (season ? " " + season.fx[0] : "");
     msgEl.classList.add("hidden");
     if (errorCode === "no-credentials") show(msgEl, t("err.noCreds"));
     else if (errorCode === "auth") show(msgEl, t("err.auth"));
@@ -187,8 +187,9 @@
   // ------------------------------------------------------------- 🌱 garden
   let garden = null;
   let gardenOn = true;
+  let season = null;        // 🎃 current season from the usage payload (hat, fx)
   let lastHarvestAt = 0;
-  const CROP_EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻" };
+  const CROP_EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻", pumpkin: "🎃" };
   function onPlot(i, plot) {
     if (plot && plot.crow) { api.gardenShoo(i); return; }          // 🐦‍⬛ shoo first
     if (!plot) { api.gardenPlant(i, null); sfx("plant"); }
@@ -388,6 +389,7 @@
   api.onUsage((d) => {
     const prev = mode;
     usage = d; errorCode = null;
+    season = d && d.season ? d.season : null;
     const lr = d && d.lastReport;
     if (lr && lr.at && lr.at !== lastReportAt) {
       if (lastReportAt) { reportOpen = true; if (!hovering) autoExpand(9000); }
@@ -411,7 +413,7 @@
     sayTemp(RESET_LINE, 2600);
     if (!hovering) autoExpand(3200);
     let n = 0;
-    const t = setInterval(() => { spawnFx(["✦", "★", "♥"][n % 3]); if (++n > 7) clearInterval(t); }, 300);
+    const t = setInterval(() => { spawnFx((season ? season.fx : ["✦", "★", "♥"])[n % 3]); if (++n > 7) clearInterval(t); }, 300);
   });
   api.onCharacter((c) => {
     if (charsNow().includes(c)) { character = c; window.__petCharacter = c; frameIdx = 0; refreshBody(); }

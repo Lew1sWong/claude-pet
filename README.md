@@ -81,6 +81,10 @@ Claude's usage API (as of Oct 2026) reports a structured list of limits instead 
 - **Weekly report card** — 📋 in the HUD: grade S/A/B/C, a title (Token Furnace, Night Owl, Weekend Warrior, Zen Master, Monday Sprinter, Pace Master, Green Thumb, Steady Hand), your heaviest day, late-night share, garden stats and tips. Every weekly reset grades the finished week and pushes the result.
 - **8-bit sounds** (off by default) and **context-aware quips** (late nights, Mondays, weekends, Fable-heavy weeks…).
 
+### 🎃 Seasons
+
+Around Halloween, Christmas, New Year and Lunar New Year the pet puts on a hat (witch / santa / party), greets you once, picks up seasonal quips and confetti, and at Halloween a 🎃 pumpkin joins the garden rotation. Dates live in `desktop/lib/season.js`.
+
 ### Track OTHER agents too (Codex / OpenClaw 🦞 / anything)
 
 Claude isn't the only thing burning tokens. In **Settings → Usage sources** you can enable:
@@ -229,6 +233,10 @@ Claude 的用量接口（2026 年 10 月起）返回的是一张结构化的额�
 - **真·额度天气** —— 预测有了画面：预计重置前会用光时面板里下像素雨，烧得太快时电闪雷鸣（开音效还有雷声），稳的时候飘小星星。天气变差时每个窗口推送一次**预警通知**。
 - **每周成绩单** —— 面板上的 📋：S/A/B/C 评级 + 称号（烧 token 狂魔 / 夜猫子 / 周末战士 / 佛系用户 / 周一冲刺手 / 节奏大师 / 种田能手 / 稳健开发者）、最猛的一天、深夜占比、菜园战绩和小建议。每周重置时自动给上一周打分并推送。
 - **8-bit 音效**（默认关）和**看场合吐槽**的宠物（深夜、周一、周末、Fable 烧得猛……）。
+
+### 🎃 应季彩蛋
+
+万圣节、圣诞、元旦、春节前后，宠物会戴上帽子（女巫帽 / 圣诞帽 / 派对帽），问候你一次，碎碎念和彩带都换成节日款；万圣节期间菜园还能种 🎃 南瓜。日期在 `desktop/lib/season.js` 里。
 
 ### 也能追踪其他 Agent 的用量（Codex / OpenClaw 龙虾 🦞 / 任意工具）
 

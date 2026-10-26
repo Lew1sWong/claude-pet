@@ -208,3 +208,6 @@ html, body {
 
 /* 📋 report mode: only the title row and the card stay visible */
 #hud.report-mode > :not(#title-row):not(#report-card):not(.wx) { display: none !important; }
+
+/* 0.6.0: "小橘 🎃" stays on one line */
+#pet-name { white-space: nowrap; }

@@ -132,7 +132,8 @@
   function frameCount(character, animState) {
     return framesFor(character, animState).length;
   }
-  function drawPet(ctx, character, animState, frameIdx, blinkOn) {
+  // hat: a SEASON_SPRITES hat id (witch / santa / party) or null
+  function drawPet(ctx, character, animState, frameIdx, blinkOn, hat) {
     const pal = SPRITES.palettes[character];
     const frames = framesFor(character, animState);
     const fi = frameIdx % frames.length;
@@ -154,6 +155,18 @@
       ctx.fillStyle = pal.d;
       for (const [ex, ey] of eyes) {
         ctx.fillRect(ex, ey + dy, 1, 1);
+      }
+    }
+    // 🎃 seasonal hat — bobs with the idle breath, comes off while lying down
+    const SS = typeof window !== "undefined" && window.SEASON_SPRITES;
+    if (hat && SS && SS.hats[hat] && animState !== "sleep") {
+      const dy = animState === "idle" && fi === 1 ? 1 : 0;
+      const hf = SS.hats[hat];
+      for (let y = 0; y < 16; y++) {
+        for (let x = 0; x < 16; x++) {
+          const c = hf[y][x];
+          if (c !== ".") { ctx.fillStyle = SS.palette[c]; ctx.fillRect(x, y + dy, 1, 1); }
+        }
       }
     }
   }

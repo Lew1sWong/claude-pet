@@ -10,6 +10,7 @@ const { fetchUsage, normalize, pickClaude, isOverage, computeMood } = require(".
 const { pushSample, trendOf } = require("./lib/history");
 const G = require("./lib/garden");
 const { computeReport } = require("./lib/report");
+const { currentSeason, seasonKey } = require("./lib/season");
 const { collectOthers } = require("./lib/providers");
 const { createBossController, DEFAULT_DISGUISES } = require("./lib/bossKey");
 const { readNotch } = require("./lib/notch");
@@ -217,7 +218,19 @@ function usagePayload(u) {
     trend: trendOf(settings.history, u, Date.now()),
     report: reportPayload(),
     lastReport: settings.lastReport || null,
+    season: currentSeason(new Date()),
   };
+}
+
+// 🎃 one greeting per season (and per year), with a little fanfare
+function maybeGreetSeason() {
+  const s = currentSeason(new Date());
+  const key = seasonKey(s);
+  if (!key || settings.seasonGreeted === key) return;
+  settings.seasonGreeted = key;
+  saveSettings();
+  notify(tr("season." + s.id));
+  sendToWin("sfx", "level");
 }
 
 // which usage sources to poll: Claude on by default; Codex / OpenClaw(龙虾) /
@@ -395,6 +408,7 @@ function createWindow() {
     const stale = !settings.lastUsageAt || Date.now() - settings.lastUsageAt > POLL_SECONDS * 1000;
     if (stale && featureFlags().usage) poll();
     else scheduleNextPoll();
+    maybeGreetSeason();
     // CLAUDE_PET_SMOKE=1: after the first poll, print what the HUD rendered
     // and the normalized usage, so a headless boot can prove the renderer works
     if (process.env.CLAUDE_PET_SMOKE) {
@@ -752,6 +766,7 @@ async function poll(manual = false) {
     if (fresh) checkPaceAlarms(merged, payload.trend);
     sendToWin("usage", { ...payload, fetchedAt: Date.now() });
     sendToWin("garden", gardenPayload());
+    maybeGreetSeason();   // a season that starts while the app is running
   }
   scheduleNextPoll();
 }
@@ -766,7 +781,8 @@ function updateTrayTitle() {
   if (process.platform === "darwin") {
     tray.setTitle(over ? " 🐾💸" : pctTxt ? ` 🐾${pctTxt}` : " 🐾", { fontType: "monospacedDigit" });
   }
-  const parts = ["Claude Pet"];
+  const season = currentSeason(new Date());
+  const parts = ["Claude Pet" + (season ? " " + season.fx[0] : "")];
   if (pctTxt) parts.push(`5h ${pctTxt}`);
   if (u && u.week) parts.push(`${tr("hud.week")} ${Math.round(u.week.pct)}%`);
   for (const s of (u && Array.isArray(u.scoped) ? u.scoped : [])) parts.push(`${s.label || "?"}✦ ${Math.round(s.pct)}%`);
@@ -884,7 +900,8 @@ ipcMain.on("stat-bump", (_e, kind) => bumpStat(kind));
 ipcMain.on("garden-plant", (_e, i, crop) => {
   if (!garden) return;
   gardenTick(false);
-  if (G.plant(garden, Number(i), typeof crop === "string" ? crop : null, Date.now())) saveGarden();
+  const season = currentSeason(new Date());
+  if (G.plant(garden, Number(i), typeof crop === "string" ? crop : null, Date.now(), season ? season.crop : null)) saveGarden();
 });
 ipcMain.on("garden-shoo", (_e, i) => {
   if (!garden) return;

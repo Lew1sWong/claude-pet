@@ -18,9 +18,11 @@ const FILES = [
   ["lib/history.js", "history.js", "PetHistory"],
   ["lib/garden.js", "garden.js", "PetGarden"],
   ["lib/report.js", "report.js", "PetReport"],
+  ["lib/season.js", "season.js", "PetSeason"],
   ["lib/strings.js", "strings.js", "PetStrings"],
   ["renderer/petcore.js", "petcore.js", null],
   ["renderer/gardensprites.js", "gardensprites.js", null],
+  ["renderer/seasonsprites.js", "seasonsprites.js", null],
   ["renderer/sfx.js", "sfx.js", null],
 ];
 

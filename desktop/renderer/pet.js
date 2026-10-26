@@ -150,7 +150,7 @@
 
   function drawFrame(t) {
     const begging = t < begUntil;
-    drawPet(ctx, character, curAnim, frameIdx, !begging && t < blinkUntil);
+    drawPet(ctx, character, curAnim, frameIdx, !begging && t < blinkUntil, season ? season.hat : null);
   }
 
   function tick(t) {
@@ -265,7 +265,7 @@
     refreshReport();
     refreshWeather();
     renderOthers(othersEl, usage && usage.others);
-    nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
+    nameEl.textContent = ((SPRITES.names && SPRITES.names[character]) || character) + (season ? " " + season.fx[0] : "");
 
     msgEl.classList.add("hidden");
     if (errorCode === "no-credentials") {
@@ -323,8 +323,10 @@
   // ------------------------------------------------------------- 🌱 garden
   let garden = null;
   let gardenOn = true;
+  let season = null;        // 🎃 current season from the usage payload (hat, fx, quips)
+  let SEASON_LINES = {};
   let lastHarvestAt = 0;
-  const CROP_EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻" };
+  const CROP_EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻", pumpkin: "🎃" };
   function onPlot(i, plot) {
     if (plot && plot.crow) { api.gardenShoo(i); return; }          // 🐦‍⬛ shoo first
     if (!plot) { api.gardenPlant(i, null); sfx("plant"); }
@@ -507,6 +509,7 @@
       const tr = usage && usage.trend;
       const wx = tr && (tr.worst === "w" ? tr.week : tr.five);
       if (wx && WEATHER_LINES[wx.weather] && Math.random() < 0.5) pool = WEATHER_LINES[wx.weather];
+      else if (season && SEASON_LINES[season.id] && Math.random() < 0.35) pool = SEASON_LINES[season.id];
       else if (Math.random() < 0.45) { const cp = contextPool(); if (cp) pool = cp; }
       sayTemp(pool[Math.floor(Math.random() * pool.length)], 2800);
     }
@@ -538,6 +541,7 @@
   // ------------------------------------------------------------- host events
   api.onUsage((d) => {
     usage = d; errorCode = null;
+    season = d && d.season ? d.season : null;
     // a freshly graded week → pop the card open and keep the HUD up a while
     const lr = d && d.lastReport;
     if (lr && lr.at && lr.at !== lastReportAt) {
@@ -556,7 +560,7 @@
     sayTemp(RESET_LINE, 2600);
     let n = 0;
     const tick = setInterval(() => {
-      spawnFx(["✦", "★", "♥"][n % 3]);
+      spawnFx((season ? season.fx : ["✦", "★", "♥"])[n % 3]);
       if (++n > 7) clearInterval(tick);
     }, 300);
   });
@@ -589,6 +593,7 @@
       if (d.lines.weather) WEATHER_LINES = d.lines.weather;
       if (d.lines.harvest) HARVEST_LINES = d.lines.harvest;
       if (d.lines.context) CONTEXT_LINES = d.lines.context;
+      if (d.lines.season) SEASON_LINES = d.lines.season;
     }
     if (window.applyI18n) window.applyI18n();
     refreshHud(); refreshBubble();

@@ -23,7 +23,7 @@
   const setJSON = (k, v) => set(k, JSON.stringify(v));
 
   // ------------------------------------------------------------- shared modules
-  const STR = window.PetStrings, U = window.PetUsage, H = window.PetHistory, G = window.PetGarden, R = window.PetReport;
+  const STR = window.PetStrings, U = window.PetUsage, H = window.PetHistory, G = window.PetGarden, R = window.PetReport, SEASON = window.PetSeason;
   const {
     computeMode, fmtCd, drawPet, frameCount, blockingWindow, lockedReason,
     renderScoped, renderExtra, renderBreakdown, renderTrend, renderGarden, renderReport, setWeatherFx,
@@ -136,6 +136,7 @@
   let lastT = performance.now();
   let petX = 0;
   let curAnim = "idle";
+  let season = SEASON.currentSeason(new Date());   // 🎃 hat, fx, quips, seasonal crop
   let microState = null;
   let microUntil = 0;
   let nextMicro = performance.now() + 12000 + Math.random() * 15000;
@@ -206,7 +207,7 @@
     const swapMs = microing ? 700 : p.frameMs;
     if (tNow - lastSwap > swapMs) { frameIdx = (frameIdx + 1) % frameCount(character, curAnim); lastSwap = tNow; }
     if (tNow > nextBlink) { blinkUntil = tNow + 160; nextBlink = tNow + 2200 + Math.random() * 3500; }
-    drawPet(ctx, character, curAnim, frameIdx, tNow < blinkUntil);
+    drawPet(ctx, character, curAnim, frameIdx, tNow < blinkUntil, season ? season.hat : null);
   }
   function rafLoop(tNow) { tick(tNow); requestAnimationFrame(rafLoop); }
 
@@ -291,7 +292,7 @@
     refreshGarden();
     refreshReport();
     refreshWeather();
-    nameEl.textContent = (SPRITES.names && SPRITES.names[character]) || character;
+    nameEl.textContent = ((SPRITES.names && SPRITES.names[character]) || character) + (season ? " " + season.fx[0] : "");
     demoTag.classList.toggle("hidden", !demo);
 
     msgEl.classList.add("hidden");
@@ -317,7 +318,7 @@
   // ------------------------------------------------------------- 🌱 garden (the page plays "main process")
   let garden = G.sanitize(getJSON(LS.garden, null));
   const saveGarden = () => setJSON(LS.garden, garden);
-  const CROP_EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻" };
+  const CROP_EMOJI = { carrot: "🥕", tomato: "🍅", sunflower: "🌻", pumpkin: "🎃" };
   function gardenTick() {
     const now = Date.now();
     G.tick(garden, computeMode(usage, errorCode), now);
@@ -352,7 +353,7 @@
     if (plot && plot.crow) {
       if (G.shoo(garden, i, now)) { sfx("shoo"); sayTemp(t("garden.shooed"), 1800); spawnFx("🐦‍⬛"); spawnFx("💨"); }
     } else if (!plot) {
-      if (G.plant(garden, i, null, now)) sfx("plant");
+      if (G.plant(garden, i, null, now, season ? season.crop : null)) sfx("plant");
     } else if (plot.progress >= 1) {
       const crop = G.harvest(garden, i);
       if (crop) celebrateHarvest(crop);
@@ -437,7 +438,7 @@
     celebrateUntil = performance.now() + 2600;
     sayTemp(line || "✦", 2600);
     let n = 0;
-    const tk = setInterval(() => { spawnFx(["✦", "★", "♥"][n % 3]); if (++n > 7) clearInterval(tk); }, 300);
+    const tk = setInterval(() => { spawnFx((season ? season.fx : ["✦", "★", "♥"])[n % 3]); if (++n > 7) clearInterval(tk); }, 300);
   }
 
   // ------------------------------------------------------------- interactions
@@ -494,6 +495,7 @@
       const tr = usage && usage.trend;
       const wx = tr && (tr.worst === "w" ? tr.week : tr.five);
       if (wx && LINES.weather && LINES.weather[wx.weather] && Math.random() < 0.5) pool = LINES.weather[wx.weather];
+      else if (season && LINES.season && LINES.season[season.id] && Math.random() < 0.35) pool = LINES.season[season.id];
       else if (Math.random() < 0.45) { const cp = contextPool(); if (cp) pool = cp; }
       sayTemp(pick(pool), 2800);
     }
@@ -559,7 +561,18 @@
   function setFoot(s) { footHint.textContent = s || ""; }
   const nowStr = () => new Date().toLocaleTimeString(lang === "en" ? "en-US" : "zh-CN", { hour: "2-digit", minute: "2-digit" });
 
+  // 🎃 one greeting per season and year
+  function maybeGreetSeason() {
+    season = SEASON.currentSeason(new Date());
+    const key = SEASON.seasonKey(season);
+    if (!key || get("cp_seasongreeted") === key) return;
+    set("cp_seasongreeted", key);
+    notifyUser(t("season." + season.id));
+    sfx("level");
+  }
+
   async function refresh() {
+    maybeGreetSeason();
     const token = (get(LS.token) || "").trim();
     const proxy = (get(LS.proxy) || "").trim();
     const m5 = get(LS.five), mw = get(LS.week), mf = get(LS.fable);
