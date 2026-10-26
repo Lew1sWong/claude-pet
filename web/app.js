@@ -15,7 +15,7 @@
     token: "cp_token", proxy: "cp_proxy", five: "cp_five", week: "cp_week", fable: "cp_fable",
     char: "cp_char", lang: "cp_lang", sound: "cp_sound", notify: "cp_notify",
     history: "cp_history", garden: "cp_garden", weekGarden: "cp_weekgarden", lastReport: "cp_lastreport",
-    paceAlarm: "cp_pacealarm", prev: "cp_prev", crowNotified: "cp_crownotified", lossNotified: "cp_lossnotified",
+    paceAlarm: "cp_pacealarm", prev: "cp_prev", alerts: "cp_alerts", crowNotified: "cp_crownotified", lossNotified: "cp_lossnotified",
   };
   const get = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
   const set = (k, v) => { try { if (v === null || v === "" || v === undefined) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* private mode */ } };
@@ -23,7 +23,7 @@
   const setJSON = (k, v) => set(k, JSON.stringify(v));
 
   // ------------------------------------------------------------- shared modules
-  const STR = window.PetStrings, U = window.PetUsage, H = window.PetHistory, G = window.PetGarden, R = window.PetReport, SEASON = window.PetSeason;
+  const STR = window.PetStrings, U = window.PetUsage, H = window.PetHistory, G = window.PetGarden, R = window.PetReport, SEASON = window.PetSeason, A = window.PetAlerts;
   const {
     computeMode, fmtCd, drawPet, frameCount, blockingWindow, lockedReason,
     renderScoped, renderExtra, renderBreakdown, renderTrend, renderGarden, renderReport, setWeatherFx,
@@ -246,11 +246,17 @@
     toastEl.classList.remove("hidden");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 5000);
-    try {
-      if (get(LS.notify) === "1" && "Notification" in window && Notification.permission === "granted" && document.hidden) {
-        new Notification("Claude Pet", { body, icon: "icons/icon-192.png" });
-      }
-    } catch { /* ignore */ }
+    if (get(LS.notify) === "1" && "Notification" in window && Notification.permission === "granted" && document.hidden) {
+      const opts = { body, icon: "icons/icon-192.png" };
+      // Android Chrome / WebView only allow notifications via the service
+      // worker (`new Notification` throws "Illegal constructor" there)
+      const viaPage = () => { try { new Notification("Claude Pet", opts); } catch { /* ignore */ } };
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistration()
+          .then((r) => (r ? r.showNotification("Claude Pet", opts) : viaPage()))
+          .catch(viaPage);
+      } else viaPage();
+    }
   }
 
   // ------------------------------------------------------------- hud
@@ -387,52 +393,62 @@
     u.lastReport = getJSON(LS.lastReport, null);
     return u;
   }
-  // resets (celebrate + water), weekly grading, pace alarms — mirrors desktop/main.js
-  function onFreshUsage(u, samples) {
+  // alert decisions come from the shared lib/alerts.js; the page only does the
+  // side effects (toasts, sounds, watering, grading). State persists across
+  // reloads (cp_alerts; older cp_prev / cp_pacealarm are migrated once).
+  let alertState = getJSON(LS.alerts, null);
+  if (!alertState) {
     const prev = getJSON(LS.prev, {});
-    const f = u.fiveHour ? u.fiveHour.pct : null, w = u.week ? u.week.pct : null;
-    const wr = u.week ? u.week.resetsAt || null : null;
-    if (prev.f != null && f !== null && prev.f >= 80 && f <= prev.f - 50) {
-      celebrate(LINES.reset); sfx("reset"); notifyUser(t("celebrate.reset")); G.water(garden); saveGarden();
-    }
-    // a new weekly window (15-point drop or a new resets_at) → grade the old week
-    const newWeek = (prev.w != null && w !== null && w < prev.w - 15) ||
-      (prev.wr && wr && Date.parse(wr) - Date.parse(prev.wr) > 24 * 3600e3);
-    let graded = false;
-    if (newWeek) {
-      const rep = R.computeReport(samples.slice(0, -1), weekGardenOpts(), Date.now());
-      if (rep && rep.grade) {
-        setJSON(LS.lastReport, { ...rep, at: Date.now() });
-        notifyUser(t("report.notify").replace("{grade}", rep.grade).replace("{title}", t("title." + rep.title))
-          .replace("{pct}", String(Math.round(rep.usedPct || 0))).replace("{n}", String(rep.depletions)));
-        reportOpen = true;
-        graded = true;
+    alertState = A.initialState();
+    if (prev.f != null) alertState.fiveHour = prev.f;
+    if (prev.w != null) alertState.week = prev.w;
+    if (prev.wr) alertState.weekReset = prev.wr;
+    alertState.pace = getJSON(LS.paceAlarm, {});
+  }
+  function onFreshUsage(u, samples) {
+    const { events, state } = A.evaluate(alertState, u, H.trendOf(samples, u, Date.now()), { isOverage: U.isOverage });
+    alertState = state;
+    setJSON(LS.alerts, state);
+    let gradedNow = false;
+    const party = () => { celebrate(LINES.reset); sfx("reset"); G.water(garden); saveGarden(); };
+    for (const e of events) {
+      switch (e.type) {
+        case "reset":
+          if (e.window === "five") { party(); notifyUser(t("celebrate.reset")); }
+          else if (e.window === "week") { party(); if (!gradedNow) notifyUser(t("celebrate.weekReset")); }
+          else if (e.window === "fable") { celebrate(LINES.reset); notifyUser(t("fable.reset")); }
+          break;
+        case "newWeek": {
+          const rep = R.computeReport(samples.slice(0, -1), weekGardenOpts(), Date.now());
+          if (rep && rep.grade) {
+            const graded = { ...rep, at: Date.now() };
+            setJSON(LS.lastReport, graded);
+            u.lastReport = graded;   // decorate() ran before us — the open card must show this week, not the one before
+            notifyUser(t("report.notify").replace("{grade}", rep.grade).replace("{title}", t("title." + rep.title))
+              .replace("{pct}", String(Math.round(rep.usedPct || 0))).replace("{n}", String(rep.depletions)));
+            reportOpen = true;
+            gradedNow = true;
+          }
+          setJSON(LS.weekGarden, { harvested: garden.harvested, lost: garden.lost, shooed: garden.shooed });
+          break;
+        }
+        case "fable":
+          notifyUser(t(e.level >= 95 ? "fable.warn95" : "fable.warn80").replace("{pct}", String(Math.round(e.pct))));
+          break;
+        case "overageOn":
+          notifyUser(t("extra.on") + (typeof e.pct === "number" ? ` (${Math.round(e.pct)}%)` : ""));
+          break;
+        case "extra":
+          notifyUser(t(e.level >= 95 ? "extra.warn95" : "extra.warn80").replace("{pct}", String(Math.round(e.pct))));
+          break;
+        case "pace":
+          notifyUser(t(`trend.alarm.${e.key}`).replace("{eta}", window.PetCore.fmtEta(e.etaMs)).replace("{reset}", window.PetCore.fmtEta(e.resetMs)));
+          sfx("warn");
+          break;
+        default:
+          break;
       }
-      setJSON(LS.weekGarden, { harvested: garden.harvested, lost: garden.lost, shooed: garden.shooed });
     }
-    if (prev.w != null && w !== null && prev.w >= 50 && w <= prev.w - 40) {
-      celebrate(LINES.reset); sfx("reset");
-      if (!graded) notifyUser(t("celebrate.weekReset"));
-      G.water(garden); saveGarden();
-    }
-    setJSON(LS.prev, { f, w, wr: wr || prev.wr || null });
-    // ⛈ pace alarm, once per window instance
-    const tr = H.trendOf(samples, u, Date.now());
-    const al = getJSON(LS.paceAlarm, {});
-    for (const key of ["f", "w"]) {
-      const o = key === "f" ? tr.five : tr.week;
-      const win = key === "f" ? u.fiveHour : u.week;
-      const id = win && win.resetsAt ? String(win.resetsAt) : null;
-      if (!o || !id) continue;
-      const bad = key === "f" ? o.weather === "storm" : (o.weather === "storm" || o.weather === "rain");
-      const underway = key === "f" || win.pct >= 30;
-      if (bad && underway && typeof o.etaMs === "number" && al[key] !== id) {
-        al[key] = id;
-        notifyUser(t(`trend.alarm.${key}`).replace("{eta}", window.PetCore.fmtEta(o.etaMs)).replace("{reset}", window.PetCore.fmtEta(o.resetMs)));
-        sfx("warn");
-      }
-    }
-    setJSON(LS.paceAlarm, al);
   }
   function celebrate(line) {
     celebrateUntil = performance.now() + 2600;

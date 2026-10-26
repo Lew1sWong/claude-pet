@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.0 — 2026-10-27 · "灵动岛一眼看懂 + 可测试的提醒"
+
+### 🏝 Dynamic Island pill badge
+- The collapsed pill used to show only the 5h %. It now carries a badge
+  left of the number: 🐦‍⬛ when a crow is on a crop (shakes; click to
+  expand and shoo), otherwise the quota weather (🌤 🌧 ⛈) when it isn't
+  sunny, otherwise the season's emoji. Nothing when all is calm.
+
+### 🔔 Alert logic extracted and tested
+- Every notification decision — 5h / weekly / Fable resets, the weekly
+  grading trigger, Fable 80 / 95, usage-credit on / 80 / 95, pace alarms
+  with their once-per-window gating — now lives in `lib/alerts.js` as a
+  pure `evaluate(prev, usage, trend)` returning events + next state, with
+  a test suite covering restarts (state restored from the cached payload),
+  threshold jumps, slept-through resets and alarm de-duplication. The main
+  process and the PWA only perform the side effects.
+- The PWA now also gets the Fable reminders, the Fable reset celebration
+  and the usage-credit alerts (it only had resets and pace alarms before);
+  its alert state persists in `cp_alerts` (older keys migrated).
+
 ## 0.6.0 — 2026-10-26 · "应季彩蛋"
 
 ### 🎃🎄🎆🧧 Seasons (desktop + web)
